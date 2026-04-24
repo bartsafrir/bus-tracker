@@ -269,17 +269,17 @@ export default function App() {
       const nameMap = new Map();
       for (const r of rr) if (r.status === 'fulfilled') for (const rt of r.value) if (!nameMap.has(rt.line_ref)) nameMap.set(rt.line_ref, rt);
 
+      // Build nearby list — keep all directions (different line_refs = different directions)
       const lines = [...byLine.values()]
         .map(v => {
           const rt = nameMap.get(v.siri_route__line_ref);
           const etaMin = v.velocity > 0 ? Math.round(v.dist / (v.velocity * 1000 / 60)) : null;
           const cities = rt ? extractCities(rt.route_long_name) : { from: '', to: '' };
-          // Find nearest stop name to user from this route's stops (approximate: use the route's destination city)
-          return { ...v, name: rt?.route_short_name || '?', agency: rt?.agency_name || '', etaMin, from: cities.from, to: cities.to };
+          return { ...v, name: rt?.route_short_name || '?', agency: rt?.agency_name || '', etaMin, from: cities.from, to: cities.to, dir: rt?.route_direction };
         })
         .filter(v => v.etaMin == null || v.etaMin < 30)
         .sort((a, b) => (a.etaMin ?? 999) - (b.etaMin ?? 999))
-        .slice(0, 6);
+        .slice(0, 8);
       setNearbyBuses(lines);
     } catch (e) { console.error('Nearby:', e); }
   }, [savedLoc]);
@@ -481,26 +481,26 @@ export default function App() {
     }
     setClosestStop(quickCl);
 
-    // Then: get real walking distances from OSRM (top 10 nearest by straight line)
+    // Then: get real walking distances from OSRM (top 20 nearest by straight line)
     async function calcWalkDist() {
       const ranked = stops
         .map(s => ({ s, d: distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon) }))
         .sort((a, b) => a.d - b.d)
-        .slice(0, 10);
+        .slice(0, 20);
 
       const pts = [`${savedLoc.lon},${savedLoc.lat}`, ...ranked.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)].join(';');
       try {
-        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=duration,distance`);
+        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=distance`);
         const data = await res.json();
-        if (cancelled || data.code !== 'Ok') return;
+        if (cancelled || data.code !== 'Ok' || !data.distances?.[0]) return;
 
-        const distances = data.distances[0]; // [0, d1, d2, ...]
-        let bestIdx = 0, bestDist = Infinity;
+        const distances = data.distances[0];
+        let bestIdx = -1, bestDist = Infinity;
         for (let i = 1; i < distances.length; i++) {
-          if (distances[i] < bestDist) { bestDist = distances[i]; bestIdx = i - 1; }
+          if (distances[i] != null && distances[i] < bestDist) { bestDist = distances[i]; bestIdx = i - 1; }
         }
-        setClosestStop(ranked[bestIdx].s);
-      } catch { /* keep straight-line pick */ }
+        if (bestIdx >= 0) setClosestStop(ranked[bestIdx].s);
+      } catch (e) { console.warn('OSRM table error:', e); }
     }
     calcWalkDist();
     return () => { cancelled = true; };
@@ -914,8 +914,8 @@ export default function App() {
                       <div key={s.lineRef} className="picker-item" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
                         <div className="badge-line" style={{ background: color.bg }}>{s.lineName}</div>
                         <div className="picker-info">
-                          <div className="picker-title">{s.agencyName}</div>
-                          {s.from && <div className="picker-sub">{fmtDir(s.from, s.to)}</div>}
+                          <div className="picker-title">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
+                          <div className="picker-sub">{s.agencyName}</div>
                         </div>
                       </div>
                     );
@@ -931,8 +931,8 @@ export default function App() {
                       <div key={r.lineRef} className="picker-item" onClick={() => startTracking(r.lineName, [r.lineRef], r.agencyName, r.from, r.to)}>
                         <div className="badge-line" style={{ background: color.bg }}>{r.lineName}</div>
                         <div className="picker-info">
-                          <div className="picker-title">{r.agencyName}</div>
-                          {r.from && <div className="picker-sub">{fmtDir(r.from, r.to)}</div>}
+                          <div className="picker-title">{r.from ? fmtDir(r.from, r.to) : r.agencyName}</div>
+                          <div className="picker-sub">{r.agencyName}</div>
                         </div>
                       </div>
                     );
@@ -1037,10 +1037,10 @@ export default function App() {
                       <div key={s.lineRef} className="row" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
                         <div className="badge-line" style={{ background: c.bg }}>{s.lineName}</div>
                         <div className="row-info">
-                          <div className="row-name">{s.agencyName}</div>
-                          {s.from && <div className="row-detail">{fmtDir(s.from, s.to)}</div>}
-                          <div className="row-detail" style={{ opacity: 0.6 }}>
-                            {s.count > 1 ? `×${s.count}` : ''}
+                          <div className="row-name">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
+                          <div className="row-detail">
+                            {s.agencyName}
+                            {s.count > 1 ? ` · ×${s.count}` : ''}
                             {s.count > 1 && s.typicalHour != null ? ` · בד״כ ${hourStr}` : ''}
                           </div>
                         </div>
@@ -1062,7 +1062,7 @@ export default function App() {
                         onClick={() => startTracking(b.name, [b.siri_route__line_ref], b.agency, b.from, b.to)}>
                         <div className="badge-line" style={{ background: c.bg }}>{b.name}</div>
                         <div className="row-info">
-                          <div className="row-name">{b.from} ← {b.to}</div>
+                          <div className="row-name">{b.from ? fmtDir(b.from, b.to) : b.name}</div>
                           <div className="row-detail">{b.agency} · {distText}</div>
                         </div>
                         {b.etaMin != null && (
