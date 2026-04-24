@@ -521,10 +521,37 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Snap route to roads via OSRM, then remove loops
+        // Get route geometry: try OSM first (exact), fall back to OSRM
         (async () => {
           const cached = getCachedRoute(stopCoords, 'bus');
           if (cached) { setRouteCoords(cached); return; }
+
+          // Try 1: OpenStreetMap — exact bus route geometry from community mapping
+          try {
+            const lats = stopCoords.map(c => c[0]), lons = stopCoords.map(c => c[1]);
+            const bbox = `${Math.min(...lats)-0.01},${Math.min(...lons)-0.01},${Math.max(...lats)+0.01},${Math.max(...lons)+0.01}`;
+            const query = `[out:json][timeout:15];relation["route"="bus"]["ref"="${lineName}"](${bbox});out geom;`;
+            const osmRes = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+            const osmData = await osmRes.json();
+            let bestCoords = null, bestDist = Infinity;
+            for (const el of osmData.elements || []) {
+              const coords = [];
+              for (const m of el.members || []) {
+                if (m.type === 'way' && m.geometry) for (const pt of m.geometry) coords.push([pt.lat, pt.lon]);
+              }
+              if (coords.length > 10) {
+                const d = distanceM(coords[0][0], coords[0][1], stopCoords[0][0], stopCoords[0][1]);
+                if (d < bestDist) { bestDist = d; bestCoords = coords; }
+              }
+            }
+            if (bestCoords && bestDist < 500) {
+              setRouteCoords(bestCoords);
+              setCachedRoute(stopCoords, 'bus', bestCoords);
+              return;
+            }
+          } catch { /* OSM failed */ }
+
+          // Try 2: OSRM route with loop removal
           try {
             const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
             const approaches = stopCoords.map(() => 'unrestricted').join(';');
@@ -536,7 +563,7 @@ export default function App() {
               setRouteCoords(clean);
               setCachedRoute(stopCoords, 'bus', clean);
             }
-          } catch { /* keep straight lines as fallback */ }
+          } catch { /* keep straight lines */ }
         })();
 
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
