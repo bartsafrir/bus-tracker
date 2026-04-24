@@ -361,7 +361,7 @@ export default function App() {
     setSearchStep('input');
 
     try {
-      const routes = await api('/gtfs_routes/list', { route_short_name: t, date: today(), limit: 100, order_by: 'date desc' });
+      const routes = await api('/gtfs_routes/list', { route_short_name: t, date: today(), limit: 200, order_by: 'date desc' });
       const todayDate = today();
       const seen = new Set();
       let unique = routes.filter(r => { if (r.date === todayDate && !seen.has(r.line_ref)) { seen.add(r.line_ref); return true; } return false; });
@@ -463,7 +463,7 @@ export default function App() {
       // Fetch all sibling directions (same operator + line name)
       if (!siblings) {
         try {
-          const allRoutes = await api('/gtfs_routes/list', { route_short_name: lineName, date: today(), limit: 50, order_by: 'date desc' });
+          const allRoutes = await api('/gtfs_routes/list', { route_short_name: lineName, date: today(), limit: 200, order_by: 'date desc' });
           const todayDate = today();
           const seen = new Set();
           const sibs = allRoutes
@@ -551,8 +551,19 @@ export default function App() {
   }, []);
 
   async function refreshVehicles(lineRefs) {
-    const refs = lineRefs || tracked?.lineRefs;
+    // Include sibling line_refs (same direction, different alternatives) so we catch all buses
+    let refs = lineRefs || tracked?.lineRefs;
     if (!refs?.length) return;
+    const sibs = tracked?.siblings;
+    if (sibs) {
+      const allRefs = new Set(refs);
+      // Add same-direction siblings (different alternatives of the same physical route)
+      const currentDir = sibs.find(s => refs.includes(s.lineRef))?.direction;
+      if (currentDir) {
+        for (const s of sibs) if (s.direction === currentDir) allRefs.add(s.lineRef);
+      }
+      refs = [...allRefs];
+    }
     try {
       const now = new Date();
       const from = new Date(now.getTime() - 5 * 60000);
@@ -583,9 +594,15 @@ export default function App() {
       const rides = await api('/gtfs_rides/list', { gtfs_route_id: scheduleData.todayGtfsRouteId, limit: 200, order_by: 'start_time asc' });
       const starts = rides.filter(r => r.start_time).map(r => new Date(r.start_time).getTime());
 
+      // Match live vehicles to schedule: by HH:MM of scheduled start time
+      // Include vehicles from all same-direction alternatives
       const liveByStart = new Map();
       for (const v of vehicles) {
-        if (v.siri_ride__scheduled_start_time) liveByStart.set(v.siri_ride__scheduled_start_time.substring(11, 16), v);
+        if (v.siri_ride__scheduled_start_time) {
+          const key = v.siri_ride__scheduled_start_time.substring(11, 16);
+          // Keep the closest vehicle if multiple match same time
+          if (!liveByStart.has(key)) liveByStart.set(key, v);
+        }
       }
 
       const nowMs = Date.now();
