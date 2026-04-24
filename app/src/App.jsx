@@ -278,6 +278,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState('');
   const [pinMode, setPinMode] = useState(false);
+  const [locError, setLocError] = useState(null);
   const [flyToTrigger, setFlyToTrigger] = useState(0);
   const [fitTrigger, setFitTrigger] = useState(0);
 
@@ -768,16 +769,27 @@ export default function App() {
           return;
         }
         // No saved location — try GPS, fallback to pin mode
+        setLocError(null);
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             pos => {
+              setLocError(null);
               saveLocation(pos.coords.latitude, pos.coords.longitude);
               setFlyToTrigger(t => t + 1);
             },
-            () => setPinMode(true),
+            (err) => {
+              const msgs = {
+                1: 'הגישה למיקום נדחתה. יש לאשר בהגדרות הדפדפן',
+                2: 'לא ניתן לזהות מיקום',
+                3: 'זמן המתנה למיקום עבר',
+              };
+              setLocError(msgs[err.code] || `שגיאה: ${err.message}`);
+              setPinMode(true);
+            },
             { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
           );
         } else {
+          setLocError('הדפדפן לא תומך במיקום');
           setPinMode(true);
         }
       }}>
@@ -787,8 +799,11 @@ export default function App() {
       {/* ── PIN BANNER ── */}
       {pinMode && (
         <div className="pin-banner">
-          <span>בחר מיקום על המפה</span>
-          <button onClick={() => setPinMode(false)}>ביטול</button>
+          <div>
+            <div>בחר מיקום על המפה</div>
+            {locError && <div style={{ fontSize: 11, opacity: 0.6, marginTop: 4 }}>{locError}</div>}
+          </div>
+          <button onClick={() => { setPinMode(false); setLocError(null); }}>ביטול</button>
         </div>
       )}
 
