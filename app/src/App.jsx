@@ -463,7 +463,7 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        getRoute(stopCoords, 'bus').then(path => { if (path) setRouteCoords(path); });
+        getRoute(stopCoords, 'auto').then(path => { if (path) setRouteCoords(path); });
 
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
         const offsets = new Map();
