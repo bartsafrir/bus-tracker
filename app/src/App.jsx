@@ -25,6 +25,20 @@ async function api(endpoint, params = {}) {
 
 function today() { return new Date().toISOString().split('T')[0]; }
 
+// OSRM routing — returns [[lat,lon],...] or null
+async function getRoute(coords, profile = 'driving') {
+  // coords: [[lat,lon],[lat,lon],...] — OSRM wants lon,lat
+  if (coords.length < 2) return null;
+  // Batch max 100 waypoints for OSRM
+  const pts = coords.slice(0, 100).map(c => `${c[1]},${c[0]}`).join(';');
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${pts}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes?.[0]) return null;
+    return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // flip back to [lat,lon]
+  } catch { return null; }
+}
+
 // ─── Leaflet icons ───
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
 const stopIconSm = L.divIcon({ className: '', html: '<div class="stop-dot"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
@@ -295,7 +309,8 @@ export default function App() {
   const [showDirPicker, setShowDirPicker] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [stops, setStops] = useState([]);
-  const [routeCoords, setRouteCoords] = useState([]);
+  const [routeCoords, setRouteCoords] = useState([]); // snapped driving route
+  const [walkRoute, setWalkRoute] = useState(null); // [[lat,lon],...] walking path
   const [closestStop, setClosestStop] = useState(null);
   const [selectedStop, setSelectedStop] = useState(null);
   const [scheduleData, setScheduleData] = useState(null);
@@ -403,8 +418,12 @@ export default function App() {
         const rideStops = await api('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
         const sorted = rideStops.filter(s => s.gtfs_stop__lat && s.gtfs_stop__lon).sort((a, b) => a.stop_sequence - b.stop_sequence);
         setStops(sorted);
-        setRouteCoords(sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]));
-        setFitTrigger(t => t + 1); // trigger map to fit the route
+        const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
+        setRouteCoords(stopCoords); // fallback: straight lines between stops
+        setFitTrigger(t => t + 1);
+
+        // Get actual driving route (async, non-blocking)
+        getRoute(stopCoords, 'driving').then(path => { if (path) setRouteCoords(path); });
 
         // Offsets
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
@@ -456,6 +475,13 @@ export default function App() {
     }
     setClosestStop(cl);
   }, [savedLoc, stops]);
+
+  // Fetch walking route to closest stop
+  useEffect(() => {
+    if (!savedLoc || !closestStop) { setWalkRoute(null); return; }
+    getRoute([[savedLoc.lat, savedLoc.lon], [closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon]], 'foot')
+      .then(path => setWalkRoute(path));
+  }, [savedLoc, closestStop]);
 
   // Watch GPS position continuously
   useEffect(() => {
@@ -531,6 +557,7 @@ export default function App() {
     setVehicles([]);
     setStops([]);
     setRouteCoords([]);
+    setWalkRoute(null);
     setSelectedStop(null);
     setSchedule(null);
     clearInterval(vehicleTimer.current);
@@ -673,7 +700,7 @@ export default function App() {
           }} />
         )}
 
-        {routeCoords.length > 1 && <Polyline positions={routeCoords} pathOptions={{ color: opColor, weight: 4, opacity: 0.5, dashArray: '8,8' }} />}
+        {routeCoords.length > 1 && <Polyline positions={routeCoords} pathOptions={{ color: opColor, weight: 4, opacity: 0.6, lineCap: 'round', lineJoin: 'round' }} />}
 
         {stops.map(s => (
           <Marker key={s.id} position={[s.gtfs_stop__lat, s.gtfs_stop__lon]}
@@ -718,11 +745,17 @@ export default function App() {
           </Marker>
         ))}
 
-        {/* Walking route line */}
-        {savedLoc && closestStop && view === 'tracking' && (
+        {/* Walking route to nearest stop */}
+        {view === 'tracking' && walkRoute && (
+          <Polyline
+            positions={walkRoute}
+            pathOptions={{ color: '#5B8DEF', weight: 3, opacity: 0.7, dashArray: '4,8', lineCap: 'round' }}
+          />
+        )}
+        {view === 'tracking' && !walkRoute && savedLoc && closestStop && (
           <Polyline
             positions={[[savedLoc.lat, savedLoc.lon], [closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon]]}
-            pathOptions={{ color: '#5B8DEF', weight: 3, opacity: 0.6, dashArray: '6,8', lineCap: 'round' }}
+            pathOptions={{ color: '#5B8DEF', weight: 3, opacity: 0.4, dashArray: '6,8', lineCap: 'round' }}
           />
         )}
 
