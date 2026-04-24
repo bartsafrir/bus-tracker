@@ -4,7 +4,7 @@ const OPERATOR_COLORS = {
   // ── Major operators ──
   'אגד':                    { bg: '#16A34A', text: '#fff' },  // Egged — green
   'דן':                     { bg: '#2563EB', text: '#fff' },  // Dan — blue
-  'מטרופולין':              { bg: '#DC2626', text: '#fff' },  // Metropoline — red
+  'מטרופולין':              { bg: '#00845D', text: '#fff' },  // Metropoline — green (brand)
   'קווים':                  { bg: '#EA580C', text: '#fff' },  // Kavim — orange
   'סופרבוס':                { bg: '#1D5FA0', text: '#fff' },  // Superbus — blue (brand)
   'נתיב אקספרס':            { bg: '#0891B2', text: '#fff' },  // Nateev Express — cyan

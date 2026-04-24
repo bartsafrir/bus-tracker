@@ -1301,7 +1301,7 @@ export default function App() {
                     <span className="sched-line-badge" style={{ background: opColor }}>{tracked?.lineName}</span>
                     {selectedStop.gtfs_stop__name || 'תחנה'}
                   </div>
-                  <div className="sched-sub">{selectedStop.gtfs_stop__city ? `${selectedStop.gtfs_stop__city} · ` : ''}{tracked?.agencyName}</div>
+                  <div className="sched-sub">{selectedStop.gtfs_stop__code ? `תחנה ${selectedStop.gtfs_stop__code} · ` : ''}{selectedStop.gtfs_stop__city ? `${selectedStop.gtfs_stop__city} · ` : ''}{tracked?.agencyName}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                   <button className="sched-close" onClick={() => { setSelectedStop(null); setView('tracking'); }}><CloseIcon size={16} /></button>
