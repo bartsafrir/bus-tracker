@@ -6,7 +6,7 @@ const OPERATOR_COLORS = {
   'דן':                     { bg: '#2563EB', text: '#fff' },  // Dan — blue
   'מטרופולין':              { bg: '#DC2626', text: '#fff' },  // Metropoline — red
   'קווים':                  { bg: '#EA580C', text: '#fff' },  // Kavim — orange
-  'סופרבוס':                { bg: '#CA8A04', text: '#fff' },  // Superbus — amber
+  'סופרבוס':                { bg: '#1D5FA0', text: '#fff' },  // Superbus — blue (brand)
   'נתיב אקספרס':            { bg: '#0891B2', text: '#fff' },  // Nateev Express — cyan
   'אלקטרה אפיקים':          { bg: '#7C3AED', text: '#fff' },  // Electra Afikim — violet
   'רכבת ישראל':             { bg: '#1D4ED8', text: '#fff' },  // Israel Railways — indigo
