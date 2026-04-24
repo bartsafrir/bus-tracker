@@ -492,41 +492,39 @@ export default function App() {
     if (!savedLoc || !stops.length) return;
     let cancelled = false;
 
-    // First: quick straight-line pick as immediate fallback
-    let minD = Infinity, quickCl = null;
-    for (const s of stops) {
-      const d = distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon);
-      if (d < minD) { minD = d; quickCl = s; }
-    }
-    setClosestStop(quickCl);
+    // Straight-line sort — always correct as immediate pick
+    const byDist = stops
+      .map(s => ({ s, d: distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon) }))
+      .sort((a, b) => a.d - b.d);
 
-    // Then: get real walking distances from OSRM (ALL stops within 2km straight line)
+    setClosestStop(byDist[0]?.s || null);
+
+    // Then: refine with OSRM walking duration
     async function calcWalkDist() {
-      const maxDist = 2000; // 2km
-      const ranked = stops
-        .map(s => ({ s, d: distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon) }))
-        .filter(r => r.d < maxDist)
-        .sort((a, b) => a.d - b.d)
-        .slice(0, 25);
+      // Take top 15 nearest by straight line
+      const candidates = byDist.slice(0, 15);
+      if (candidates.length < 2) return;
 
-      if (!ranked.length) return;
+      const pts = [
+        `${savedLoc.lon},${savedLoc.lat}`,
+        ...candidates.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)
+      ].join(';');
 
-      const pts = [`${savedLoc.lon},${savedLoc.lat}`, ...ranked.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)].join(';');
       try {
         const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=duration`);
+        if (!res.ok) return;
         const data = await res.json();
         if (cancelled || data.code !== 'Ok' || !data.durations?.[0]) return;
 
-        const durations = data.durations[0]; // walking seconds from user to each stop
+        const durations = data.durations[0];
         let bestIdx = -1, bestTime = Infinity;
         for (let i = 1; i < durations.length; i++) {
           if (durations[i] != null && durations[i] < bestTime) { bestTime = durations[i]; bestIdx = i - 1; }
         }
-        if (bestIdx >= 0 && ranked[bestIdx].s.id !== quickCl?.id) {
-          console.log(`OSRM: closest by walk = ${ranked[bestIdx].s.gtfs_stop__name} (${Math.round(bestTime/60)}min), was ${quickCl?.gtfs_stop__name}`);
-          setClosestStop(ranked[bestIdx].s);
+        if (bestIdx >= 0) {
+          setClosestStop(candidates[bestIdx].s);
         }
-      } catch (e) { console.warn('OSRM table error:', e); }
+      } catch (e) { /* keep straight-line pick */ }
     }
     calcWalkDist();
     return () => { cancelled = true; };
