@@ -715,17 +715,21 @@ export default function App() {
         routeIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
       )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-      // Also fetch NEXT day's rides (for when today's are all past, e.g., Saturday evening)
-      const todayDate = today();
-      const nextDay = new Date(new Date(todayDate).getTime() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-      const sibRefs = tracked?.siblings?.map(s => s.lineRef) || tracked?.lineRefs || [];
-      const nextDayRoutes = await api('/gtfs_routes/list', { line_refs: [...new Set([...sibRefs, ...tracked?.lineRefs || []])].join(','), date: nextDay, limit: 50, order_by: 'date desc' }).catch(() => []);
-      const nextDayRouteIds = nextDayRoutes.filter(r => r.date === nextDay).map(r => r.id);
-      if (nextDayRouteIds.length) {
-        const nextRides = (await Promise.allSettled(
-          nextDayRouteIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
-        )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
-        allRides.push(...nextRides);
+      // Also try fetching next 3 days' rides (for Shabbat → Sunday gaps)
+      const allLineRefs = [...new Set([...(tracked?.siblings?.map(s => s.lineRef) || []), ...(tracked?.lineRefs || [])])];
+      for (let dayOffset = 1; dayOffset <= 3; dayOffset++) {
+        const futureDay = new Date(Date.now() + dayOffset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+        try {
+          const futureRoutes = await api('/gtfs_routes/list', { line_refs: allLineRefs.join(','), date: futureDay, limit: 50, order_by: 'date desc' });
+          const futureIds = futureRoutes.filter(r => r.date === futureDay).map(r => r.id);
+          if (futureIds.length) {
+            const futureRides = (await Promise.allSettled(
+              futureIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
+            )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
+            allRides.push(...futureRides);
+            break; // found data, no need to check further
+          }
+        } catch { /* continue */ }
       }
 
       // Deduplicate by start_time
@@ -1469,7 +1473,7 @@ export default function App() {
                         <div style={{ padding: '20px 24px', textAlign: 'center' }}>
                           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 }}>אין נסיעות פעילות כרגע</div>
                           <div style={{ fontSize: 13, color: 'var(--text2)' }}>
-                            {nextLabel || 'בדוק שוב מאוחר יותר'}
+                            {nextLabel || 'לוח הזמנים עדיין לא פורסם — בדוק שוב מאוחר יותר'}
                           </div>
                         </div>
                       );
