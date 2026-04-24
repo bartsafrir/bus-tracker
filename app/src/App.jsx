@@ -30,60 +30,61 @@ async function apiFetch(endpoint, params = {}) {
 import { getRoute } from './utils/polyline';
 import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
-// Post-process OSRM route: remove loops, then re-attach orphaned stops.
+// Post-process OSRM route: remove loops, but keep loops that serve stops.
 function removeLoops(path, stopCoords) {
-  if (path.length < 10) return path;
+  if (path.length < 10 || !stopCoords?.length) return path;
   const GRID = 0.0003; // ~30m
   const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
 
-  // Step 1: remove loops (path revisits a grid cell)
-  const cleaned = [];
+  // For each detected loop, check if removing it would orphan a stop.
+  // If yes, keep the loop. If no, remove it.
+  const result = [];
   let i = 0;
   while (i < path.length) {
-    cleaned.push(path[i]);
+    result.push(path[i]);
     const key = cellKey(path[i][0], path[i][1]);
     let jumpTo = -1;
     for (let j = i + 10; j < Math.min(i + 150, path.length); j++) {
       if (cellKey(path[j][0], path[j][1]) === key) jumpTo = j;
     }
-    i = jumpTo > 0 ? jumpTo + 1 : i + 1;
-  }
-  if (cleaned.length < 2) return path;
-  if (!stopCoords?.length) return cleaned;
 
-  // Step 2: find stops that are now too far from the cleaned path (>60m)
-  // For each stop, find the closest point on the cleaned path
-  const MAX_DIST = 60;
-  const result = [];
-  let pathIdx = 0;
+    if (jumpTo > 0) {
+      // Found a loop from i to jumpTo. Check: would any stop be orphaned?
+      // A stop is "served by the loop" if it's closer to the loop segment
+      // than to the non-loop path (i.e., the remaining path without the loop).
+      const loopSegment = path.slice(i, jumpTo + 1);
+      let stopNeedsLoop = false;
 
-  for (let s = 0; s < stopCoords.length; s++) {
-    const stop = stopCoords[s];
+      for (const stop of stopCoords) {
+        // Distance from stop to closest point IN the loop
+        let minLoopDist = Infinity;
+        for (const p of loopSegment) {
+          const d = distanceM(stop[0], stop[1], p[0], p[1]);
+          if (d < minLoopDist) minLoopDist = d;
+        }
+        // Distance from stop to the junction point (where we'd skip to)
+        const junctionDist = distanceM(stop[0], stop[1], path[jumpTo][0], path[jumpTo][1]);
 
-    // Find closest point on cleaned path from current position onward
-    let bestIdx = pathIdx, bestDist = Infinity;
-    for (let p = pathIdx; p < cleaned.length; p++) {
-      const d = distanceM(stop[0], stop[1], cleaned[p][0], cleaned[p][1]);
-      if (d < bestDist) { bestDist = d; bestIdx = p; }
-      // Don't look too far ahead
-      if (p > pathIdx + 200) break;
+        // If a stop is very close to the loop (<40m) and far from the junction (>80m),
+        // this loop is needed to reach that stop
+        if (minLoopDist < 40 && junctionDist > 80) {
+          stopNeedsLoop = true;
+          break;
+        }
+      }
+
+      if (stopNeedsLoop) {
+        // Keep the loop — don't skip
+        i++;
+      } else {
+        // Remove the loop — skip to jumpTo
+        i = jumpTo + 1;
+      }
+    } else {
+      i++;
     }
-
-    // Add path up to closest point
-    for (let p = pathIdx; p <= bestIdx; p++) result.push(cleaned[p]);
-    pathIdx = bestIdx + 1;
-
-    // If stop is too far from path, add a spur: path→stop→path
-    if (bestDist > MAX_DIST) {
-      result.push(stop); // go to stop
-      if (bestIdx + 1 < cleaned.length) result.push(cleaned[bestIdx + 1]); // come back
-    }
   }
-
-  // Add remaining path
-  for (let p = pathIdx; p < cleaned.length; p++) result.push(cleaned[p]);
-
-  return result.length > 1 ? result : cleaned;
+  return result.length > 1 ? result : path;
 }
 
 // ─── Leaflet icons ───
