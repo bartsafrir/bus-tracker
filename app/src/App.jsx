@@ -30,32 +30,39 @@ async function apiFetch(endpoint, params = {}) {
 import { getRoute } from './utils/polyline';
 import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
-// Post-process OSRM route: detect and remove loops.
-// A loop = the path revisits a point it was near earlier.
-// We use a spatial grid: if the path enters a cell it already visited
-// AND the direction reversed, cut out the loop segment.
-function removeLoops(path) {
+// Post-process OSRM route: detect and remove loops that don't contain stops.
+// A loop = the path revisits a grid cell it already passed through.
+// Only remove if no bus stops are inside the loop area.
+function removeLoops(path, stopCoords) {
   if (path.length < 10) return path;
-  const GRID = 0.0003; // ~30m grid cells
+  const GRID = 0.0004; // ~40m grid cells
   const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
 
-  // Pass 1: for each point, find if a later point is in the same cell
-  // If so, everything between them is a loop — remove it.
+  // Pre-compute which grid cells contain stops
+  const stopCells = new Set();
+  for (const s of stopCoords) stopCells.add(cellKey(s[0], s[1]));
+
   const result = [];
   let i = 0;
   while (i < path.length) {
     result.push(path[i]);
-    // Look ahead: is there a point >10 steps later in the same cell?
     const key = cellKey(path[i][0], path[i][1]);
     let jumpTo = -1;
-    for (let j = i + 10; j < Math.min(i + 150, path.length); j++) {
+
+    // Look ahead for revisit of same cell
+    for (let j = i + 8; j < Math.min(i + 120, path.length); j++) {
       if (cellKey(path[j][0], path[j][1]) === key) {
-        jumpTo = j;
-        // Don't break — find the LAST match (largest loop removal)
+        // Check if any stops are inside this loop segment
+        let hasStop = false;
+        for (let k = i + 1; k < j; k++) {
+          if (stopCells.has(cellKey(path[k][0], path[k][1]))) { hasStop = true; break; }
+        }
+        // Only remove if no stops inside — it's a routing artifact
+        if (!hasStop) { jumpTo = j; break; }
       }
     }
+
     if (jumpTo > 0) {
-      // Skip the loop: jump from i to jumpTo
       i = jumpTo + 1;
     } else {
       i++;
@@ -509,7 +516,7 @@ export default function App() {
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
               const raw = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-              const clean = removeLoops(raw);
+              const clean = removeLoops(raw, stopCoords);
               setRouteCoords(clean);
               setCachedRoute(stopCoords, 'bus', clean);
             }
