@@ -9,76 +9,80 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Google Sans Text', system-ui; background: #0a0a0f; color: #eee; padding: 24px; }
 h1 { text-align: center; margin-bottom: 8px; font-size: 22px; }
-p { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; max-width: 1200px; margin: 0 auto; }
+.sub { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; max-width: 1200px; margin: 0 auto; }
 .card {
-  background: #16161e; border-radius: 16px; padding: 20px; display: flex; gap: 16px; align-items: center;
+  background: #16161e; border-radius: 16px; padding: 16px 20px; display: flex; gap: 16px; align-items: center;
   border: 1px solid rgba(255,255,255,0.04);
 }
 .badge {
-  width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 20px; color: white; flex-shrink: 0; font-family: 'Google Sans', system-ui;
+  width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 18px; color: white; flex-shrink: 0; font-family: 'Google Sans', system-ui;
 }
 .info { flex: 1; min-width: 0; }
-.name-he { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
-.name-en { font-size: 12px; color: #888; margin-bottom: 6px; }
-.color-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.swatch { width: 20px; height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-.hex { font-size: 12px; color: #aaa; font-family: monospace; direction: ltr; }
-.logo-img { width: 80px; height: 40px; object-fit: contain; flex-shrink: 0; background: white; border-radius: 8px; padding: 4px; }
-.note { font-size: 11px; color: #555; margin-top: 4px; }
-.section { grid-column: 1 / -1; font-size: 14px; font-weight: 700; color: #555; padding: 16px 0 4px; border-bottom: 1px solid rgba(255,255,255,0.04); margin-bottom: 4px; }
+.name-he { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+.name-en { font-size: 11px; color: #888; margin-bottom: 4px; }
+.color-row { display: flex; align-items: center; gap: 6px; }
+.swatch { width: 16px; height: 16px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.1); flex-shrink: 0; }
+.hex { font-size: 11px; color: #aaa; font-family: monospace; direction: ltr; }
+.logo-wrap {
+  width: 80px; height: 44px; background: white; border-radius: 8px; padding: 4px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  overflow: hidden;
+}
+.logo-wrap img { max-width: 72px; max-height: 36px; object-fit: contain; }
+.section {
+  grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: #444;
+  padding: 20px 0 6px; border-bottom: 1px solid rgba(255,255,255,0.04);
+  letter-spacing: 0.5px;
+}
 </style>
 </head>
 <body>
 <h1>Operator Brand Colors Audit</h1>
-<p>App color vs real brand logo — verify each one matches</p>
+<p class="sub">App badge color vs real brand logo</p>
 <div class="grid">
 
 <div class="section">מפעילים מרכזיים</div>
 
 <div class="card">
-  <div class="badge" style="background:#16A34A">א</div>
+  <div class="badge" style="background:#008D36">א</div>
   <div class="info">
     <div class="name-he">אגד</div>
     <div class="name-en">Egged</div>
-    <div class="color-row"><div class="swatch" style="background:#16A34A"></div><span class="hex">#16A34A</span></div>
-    <div class="note">Brand: green alef logo. ✅ Green is correct</div>
+    <div class="color-row"><div class="swatch" style="background:#008D36"></div><span class="hex">#008D36</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/b/b0/Egged_logo11.svg/200px-Egged_logo11.svg.png" alt="Egged" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Egged_logo.svg/250px-Egged_logo.svg.png" alt="Egged"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#2563EB">ד</div>
+  <div class="badge" style="background:#00A0E3">ד</div>
   <div class="info">
     <div class="name-he">דן</div>
     <div class="name-en">Dan</div>
-    <div class="color-row"><div class="swatch" style="background:#2563EB"></div><span class="hex">#2563EB</span></div>
-    <div class="note">Brand: blue/turquoise. ✅ Blue is correct</div>
+    <div class="color-row"><div class="swatch" style="background:#00A0E3"></div><span class="hex">#00A0E3</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/4/40/DanBusCompanyLogo.svg/200px-DanBusCompanyLogo.svg.png" alt="Dan" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9d/Dan_Bus_Company_logo.png/120px-Dan_Bus_Company_logo.png" alt="Dan"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#DC2626">מ</div>
+  <div class="badge" style="background:#00845D">מ</div>
   <div class="info">
     <div class="name-he">מטרופולין</div>
     <div class="name-en">Metropoline</div>
-    <div class="color-row"><div class="swatch" style="background:#DC2626"></div><span class="hex">#DC2626</span></div>
-    <div class="note">Brand: green/blue logo. ⚠️ We have red — should be green/teal?</div>
+    <div class="color-row"><div class="swatch" style="background:#00845D"></div><span class="hex">#00845D</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/4/48/Metropoline_bus_logo.svg/200px-Metropoline_bus_logo.svg.png" alt="Metropoline" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Metropoline_buses_logo.svg/250px-Metropoline_buses_logo.svg.png" alt="Metropoline"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#EA580C">ק</div>
+  <div class="badge" style="background:#1B3A6B">ק</div>
   <div class="info">
     <div class="name-he">קווים</div>
     <div class="name-en">Kavim</div>
-    <div class="color-row"><div class="swatch" style="background:#EA580C"></div><span class="hex">#EA580C</span></div>
-    <div class="note">Brand: orange/red. ✅ Orange is correct</div>
+    <div class="color-row"><div class="swatch" style="background:#1B3A6B"></div><span class="hex">#1B3A6B</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/8/85/Kavim_logo.svg/200px-Kavim_logo.svg.png" alt="Kavim" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/ac/KavimLogo.svg/250px-KavimLogo.svg.png" alt="Kavim"></div>
 </div>
 
 <div class="card">
@@ -87,41 +91,38 @@ p { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
     <div class="name-he">סופרבוס</div>
     <div class="name-en">Superbus</div>
     <div class="color-row"><div class="swatch" style="background:#1D5FA0"></div><span class="hex">#1D5FA0</span></div>
-    <div class="note">Brand: blue + green rings. ✅ Blue is correct</div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/c/cd/Superbus_logo.svg/200px-Superbus_logo.svg.png" alt="Superbus" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Superbus_logo.svg/250px-Superbus_logo.svg.png" alt="Superbus"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#0891B2">נ</div>
+  <div class="badge" style="background:#003D79">נ</div>
   <div class="info">
     <div class="name-he">נתיב אקספרס</div>
     <div class="name-en">Nateev Express</div>
-    <div class="color-row"><div class="swatch" style="background:#0891B2"></div><span class="hex">#0891B2</span></div>
-    <div class="note">Brand: blue/teal. ✅ Cyan is close</div>
+    <div class="color-row"><div class="swatch" style="background:#003D79"></div><span class="hex">#003D79</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/e/e1/NateevExpress.svg/200px-NateevExpress.svg.png" alt="Nateev Express" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Nateev_Express_Logo.svg/250px-Nateev_Express_Logo.svg.png" alt="Nateev Express"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#7C3AED">א</div>
+  <div class="badge" style="background:#6A2382">א</div>
   <div class="info">
     <div class="name-he">אלקטרה אפיקים</div>
     <div class="name-en">Electra Afikim</div>
-    <div class="color-row"><div class="swatch" style="background:#7C3AED"></div><span class="hex">#7C3AED</span></div>
-    <div class="note">Brand: blue/purple. ⚠️ Need to verify</div>
+    <div class="color-row"><div class="swatch" style="background:#6A2382"></div><span class="hex">#6A2382</span></div>
   </div>
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/he/thumb/3/3d/Electra-Afikim.svg/250px-Electra-Afikim.svg.png" alt="Electra Afikim"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#1D4ED8">ר</div>
+  <div class="badge" style="background:#003DA5">ר</div>
   <div class="info">
     <div class="name-he">רכבת ישראל</div>
     <div class="name-en">Israel Railways</div>
-    <div class="color-row"><div class="swatch" style="background:#1D4ED8"></div><span class="hex">#1D4ED8</span></div>
-    <div class="note">Brand: blue. ✅ Correct</div>
+    <div class="color-row"><div class="swatch" style="background:#003DA5"></div><span class="hex">#003DA5</span></div>
   </div>
-  <img class="logo-img" src="https://upload.wikimedia.org/wikipedia/he/thumb/5/54/Israel_Railways_Logo.svg/200px-Israel_Railways_Logo.svg.png" alt="Israel Railways" onerror="this.style.display='none'">
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Israel_Railways_Logo.svg/250px-Israel_Railways_Logo.svg.png" alt="Israel Railways"></div>
 </div>
 
 <div class="section">אזוריים / קטנים</div>
@@ -132,28 +133,28 @@ p { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
     <div class="name-he">ש.א.מ</div>
     <div class="name-en">SHA.M</div>
     <div class="color-row"><div class="swatch" style="background:#15803D"></div><span class="hex">#15803D</span></div>
-    <div class="note">Brand: green. ✅ Correct</div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">אין לוגו</div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#1E40AF">ד</div>
+  <div class="badge" style="background:#00A0E3">ד</div>
   <div class="info">
     <div class="name-he">דן בדרום</div>
     <div class="name-en">Dan BaDarom</div>
-    <div class="color-row"><div class="swatch" style="background:#1E40AF"></div><span class="hex">#1E40AF</span></div>
-    <div class="note">Brand: same as Dan but south. ✅ Darker blue</div>
+    <div class="color-row"><div class="swatch" style="background:#00A0E3"></div><span class="hex">#00A0E3</span></div>
   </div>
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/he/thumb/6/67/%D7%93%D7%9F_%D7%91%D7%93%D7%A8%D7%95%D7%9D.svg/250px-%D7%93%D7%9F_%D7%91%D7%93%D7%A8%D7%95%D7%9D.svg.png" alt="Dan BaDarom"></div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#0369A1">ג</div>
+  <div class="badge" style="background:#0077B6">ג</div>
   <div class="info">
     <div class="name-he">גלים</div>
     <div class="name-en">Galim</div>
-    <div class="color-row"><div class="swatch" style="background:#0369A1"></div><span class="hex">#0369A1</span></div>
-    <div class="note">Brand: blue. ✅ Correct</div>
+    <div class="color-row"><div class="swatch" style="background:#0077B6"></div><span class="hex">#0077B6</span></div>
   </div>
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/he/thumb/6/60/%D7%92%D7%9C%D7%99%D7%9D_-_%D7%A0%D7%A8%D7%A7%D7%99%D7%A1_%D7%92%D7%9C_%D7%94%D7%A1%D7%A2%D7%95%D7%AA.svg/250px-%D7%92%D7%9C%D7%99%D7%9D_-_%D7%A0%D7%A8%D7%A7%D7%99%D7%A1_%D7%92%D7%9C_%D7%94%D7%A1%D7%A2%D7%95%D7%AA.svg.png" alt="Galim"></div>
 </div>
 
 <div class="card">
@@ -162,70 +163,60 @@ p { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
     <div class="name-he">תנופה</div>
     <div class="name-en">Tnufa</div>
     <div class="color-row"><div class="swatch" style="background:#BE185D"></div><span class="hex">#BE185D</span></div>
-    <div class="note">Brand: red/maroon. ✅ Pink is close</div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">אין לוגו</div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#B45309">ב</div>
+  <div class="badge" style="background:#2E5090">ב</div>
   <div class="info">
     <div class="name-he">בית שמש אקספרס</div>
     <div class="name-en">Beit Shemesh Express</div>
-    <div class="color-row"><div class="swatch" style="background:#B45309"></div><span class="hex">#B45309</span></div>
-    <div class="note">Brand: needs verification</div>
+    <div class="color-row"><div class="swatch" style="background:#2E5090"></div><span class="hex">#2E5090</span></div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">אין לוגו</div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#6D28D9">נ</div>
+  <div class="badge" style="background:#C62828">כ</div>
   <div class="info">
-    <div class="name-he">נסיעות ותיירות</div>
-    <div class="name-en">Travel & Tourism</div>
-    <div class="color-row"><div class="swatch" style="background:#6D28D9"></div><span class="hex">#6D28D9</span></div>
-    <div class="note">Brand: needs verification</div>
+    <div class="name-he">כרמלית</div>
+    <div class="name-en">Carmelit</div>
+    <div class="color-row"><div class="swatch" style="background:#C62828"></div><span class="hex">#C62828</span></div>
   </div>
-</div>
-
-<div class="card">
-  <div class="badge" style="background:#047857">מ</div>
-  <div class="info">
-    <div class="name-he">מועצה אזורית גולן</div>
-    <div class="name-en">Golan Regional Council</div>
-    <div class="color-row"><div class="swatch" style="background:#047857"></div><span class="hex">#047857</span></div>
-    <div class="note">Brand: green. ✅ Correct</div>
-  </div>
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Carmelit.svg/250px-Carmelit.svg.png" alt="Carmelit"></div>
 </div>
 
 <div class="section">ירושלים</div>
 
 <div class="card">
-  <div class="badge" style="background:#C2410C">י</div>
+  <div class="badge" style="background:#D4A017">י</div>
   <div class="info">
     <div class="name-he">ירושלים (איחוד)</div>
     <div class="name-en">Jerusalem Union</div>
-    <div class="color-row"><div class="swatch" style="background:#C2410C"></div><span class="hex">#C2410C</span></div>
-    <div class="note">Brand: needs verification</div>
+    <div class="color-row"><div class="swatch" style="background:#D4A017"></div><span class="hex">#D4A017</span></div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">אין לוגו</div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#B91C1C">א</div>
+  <div class="badge" style="background:#1B5E20">א</div>
   <div class="info">
     <div class="name-he">אקסטרה ירושלים</div>
     <div class="name-en">Extra Jerusalem</div>
-    <div class="color-row"><div class="swatch" style="background:#B91C1C"></div><span class="hex">#B91C1C</span></div>
-    <div class="note">Brand: needs verification</div>
+    <div class="color-row"><div class="swatch" style="background:#1B5E20"></div><span class="hex">#1B5E20</span></div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">אין לוגו</div>
 </div>
 
 <div class="card">
-  <div class="badge" style="background:#166534">ד</div>
+  <div class="badge" style="background:#008D36">ד</div>
   <div class="info">
     <div class="name-he">דרך אגד עוטף ירושלים</div>
     <div class="name-en">Derech Egged Jerusalem</div>
-    <div class="color-row"><div class="swatch" style="background:#166534"></div><span class="hex">#166534</span></div>
-    <div class="note">Brand: Egged subsidiary → green. ✅ Correct</div>
+    <div class="color-row"><div class="swatch" style="background:#008D36"></div><span class="hex">#008D36</span></div>
   </div>
+  <div class="logo-wrap"><img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Egged_logo.svg/250px-Egged_logo.svg.png" alt="Egged" style="opacity:0.6"></div>
 </div>
 
 <div class="card">
@@ -234,8 +225,8 @@ p { text-align: center; color: #666; font-size: 13px; margin-bottom: 32px; }
     <div class="name-he">(ברירת מחדל)</div>
     <div class="name-en">Default / Unknown</div>
     <div class="color-row"><div class="swatch" style="background:#475569"></div><span class="hex">#475569</span></div>
-    <div class="note">Fallback for unrecognized operators</div>
   </div>
+  <div class="logo-wrap" style="background:#eee;font-size:10px;color:#999">fallback</div>
 </div>
 
 </div>
