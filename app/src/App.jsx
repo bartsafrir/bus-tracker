@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRouteStops, useTodayRouteId, useSiblings, api } from './hooks/useTransitData';
 import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
 import { distanceM } from './utils/geo';
@@ -8,11 +10,11 @@ import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon, CloseIcon, WalkI
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 
-const API = 'https://open-bus-stride-api.hasadna.org.il';
+const API_BASE = 'https://open-bus-stride-api.hasadna.org.il';
 
-// ─── Simple fetch with timeout ───
-async function api(endpoint, params = {}) {
-  const url = new URL(`${API}${endpoint}`);
+// ─── Simple fetch with timeout (used for non-cached calls) ───
+async function apiFetch(endpoint, params = {}) {
+  const url = new URL(`${API_BASE}${endpoint}`);
   for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, String(v));
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 15000);
@@ -287,7 +289,7 @@ export default function App() {
       const now = new Date();
       const from = new Date(now.getTime() - 5 * 60000);
       const offset = 1.5 / 111;
-      const locs = await api('/siri_vehicle_locations/list', {
+      const locs = await apiFetch('/siri_vehicle_locations/list', {
         lat__greater_or_equal: savedLoc.lat - offset,
         lat__lower_or_equal: savedLoc.lat + offset,
         lon__greater_or_equal: savedLoc.lon - offset,
@@ -349,7 +351,7 @@ export default function App() {
           // Get live vehicles for this line
           const now = new Date();
           const from = new Date(now.getTime() - 5 * 60000);
-          const locs = await api('/siri_vehicle_locations/list', {
+          const locs = await apiFetch('/siri_vehicle_locations/list', {
             siri_routes__line_ref: s.lineRef,
             recorded_at_time_from: from.toISOString(),
             recorded_at_time_to: now.toISOString(),
@@ -358,12 +360,12 @@ export default function App() {
           const vehicles = latestPerVehicle(locs);
 
           // Get stops to find nearest stop to user
-          const todayRoutes = await api('/gtfs_routes/list', { line_refs: s.lineRef, date: today(), limit: 1, order_by: 'date desc' });
+          const todayRoutes = await apiFetch('/gtfs_routes/list', { line_refs: s.lineRef, date: today(), limit: 1, order_by: 'date desc' });
           const routeId = todayRoutes[0]?.id;
           if (!routeId) return;
-          const rides = await api('/gtfs_rides/list', { gtfs_route_id: routeId, limit: 1 });
+          const rides = await apiFetch('/gtfs_rides/list', { gtfs_route_id: routeId, limit: 1 });
           if (!rides.length) return;
-          const rideStops = await api('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
+          const rideStops = await apiFetch('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
           const validStops = rideStops.filter(st => st.gtfs_stop__lat && st.gtfs_stop__lon).sort((a, b) => a.stop_sequence - b.stop_sequence);
           if (!validStops.length) return;
 
@@ -447,6 +449,34 @@ export default function App() {
   const vehicleTimer = useRef(null);
   const searchInputRef = useRef(null);
 
+  // ─── React Query: cached route data ───
+  const trackingLineRef = tracked?.lineRefs?.[0] || null;
+  const todayDate = useMemo(() => today(), []);
+  const { data: todayRouteId } = useTodayRouteId(trackingLineRef, todayDate);
+  const { data: routeStopsData } = useRouteStops(todayRouteId);
+  const { data: siblingsData } = useSiblings(tracked?.lineName, tracked?.agencyName, todayDate);
+
+  // Sync React Query data → local state (for backward compat with existing rendering)
+  useEffect(() => {
+    if (!routeStopsData) return;
+    setStops(routeStopsData.stops);
+    setRouteCoords(routeStopsData.stops.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]));
+    setScheduleData({ stopOffsets: routeStopsData.offsets, todayGtfsRouteId: todayRouteId, referenceRideStart: routeStopsData.refStart });
+    setFitTrigger(t => t + 1);
+    // Get actual driving route
+    getRoute(routeStopsData.stops.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]), 'bus').then(path => { if (path) setRouteCoords(path); });
+  }, [routeStopsData, todayRouteId]);
+
+  // Sync siblings
+  useEffect(() => {
+    if (!siblingsData?.length || !tracked) return;
+    const sibs = siblingsData.map(r => {
+      const c = extractCities(r.routeLongName);
+      return { lineRef: r.lineRef, from: c.from, to: c.to, direction: r.direction, alternative: r.alternative };
+    });
+    if (sibs.length > 1) setTracked(prev => prev ? { ...prev, siblings: sibs } : prev);
+  }, [siblingsData]);
+
   // ─── Derived ───
   const fitCoords = useMemo(() => {
     const c = [...routeCoords];
@@ -474,7 +504,7 @@ export default function App() {
     setSearchStep('input');
 
     try {
-      const routes = await api('/gtfs_routes/list', { route_short_name: t, date: today(), limit: 200, order_by: 'date desc' });
+      const routes = await apiFetch('/gtfs_routes/list', { route_short_name: t, date: today(), limit: 200, order_by: 'date desc' });
       const todayDate = today();
       const seen = new Set();
       let unique = routes.filter(r => { if (r.date === todayDate && !seen.has(r.line_ref)) { seen.add(r.line_ref); return true; } return false; });
@@ -489,7 +519,7 @@ export default function App() {
             api('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time asc' }),
             api('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time desc' }),
           ]);
-          const allR = await api('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 200 });
+          const allR = await apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 200 });
           return {
             ...r,
             firstTime: first[0]?.start_time ? toIsraelTime(new Date(first[0].start_time)) : null,
@@ -524,80 +554,26 @@ export default function App() {
   }
 
   // ═══ TRACK LINE ═══
+  // Route stops, path, and siblings are now handled by React Query hooks above.
+  // startTracking just sets the state that triggers those hooks.
   async function startTracking(lineName, lineRefs, agencyName, dirFrom, dirTo, siblings) {
     setView('tracking');
     setShowDirPicker(false);
-    setLoading(true);
-    setLoadingMsg('טוען מסלול...');
     const color = getOperatorColor(agencyName);
     setOpColor(color.bg);
     setTracked({ lineName, lineRefs, agencyName, from: dirFrom || '', to: dirTo || '', siblings: siblings || null });
     logUsage({ lineName, lineRef: lineRefs[0], agencyName, from: dirFrom || '', to: dirTo || '' });
     setVehicles([]);
-    setStops([]);
-    setRouteCoords([]);
-    setClosestStop(null);
     setSelectedStop(null);
-    setScheduleData(null);
     setSchedule(null);
+    setWalkRoute(null);
     clearInterval(vehicleTimer.current);
 
+    // Only manual work: fetch vehicles (live, not cached)
     try {
-      // Get today's route ID
-      const todayRoutes = await api('/gtfs_routes/list', { line_refs: lineRefs[0], date: today(), limit: 1, order_by: 'date desc' });
-      const routeId = todayRoutes[0]?.id || null;
-
-      // Get one ride for stops
-      const rides = await api('/gtfs_rides/list', routeId ? { gtfs_route_id: routeId, limit: 1 } : { gtfs_route__line_refs: lineRefs[0], limit: 1 });
-      if (rides.length) {
-        const rideStops = await api('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
-        const sorted = rideStops.filter(s => s.gtfs_stop__lat && s.gtfs_stop__lon).sort((a, b) => a.stop_sequence - b.stop_sequence);
-        setStops(sorted);
-        const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
-        setRouteCoords(stopCoords); // fallback: straight lines between stops
-        setFitTrigger(t => t + 1);
-
-        // Get actual driving route (async, non-blocking)
-        getRoute(stopCoords, 'bus').then(path => { if (path) setRouteCoords(path); });
-
-        // Offsets
-        const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
-        const offsets = new Map();
-        for (const s of sorted) {
-          if (s.arrival_time && s.gtfs_stop_id && refStart) {
-            offsets.set(s.gtfs_stop_id, { offsetMs: new Date(s.arrival_time).getTime() - refStart, shapeDist: s.shape_dist_traveled });
-          }
-        }
-        setScheduleData({ stopOffsets: offsets, todayGtfsRouteId: routeId, referenceRideStart: refStart });
-
-        // closestStop is recalculated by useEffect when savedLoc or stops change
-      }
-
-      // Fetch all sibling directions (same operator + line name)
-      if (!siblings) {
-        try {
-          const allRoutes = await api('/gtfs_routes/list', { route_short_name: lineName, date: today(), limit: 200, order_by: 'date desc' });
-          const todayDate = today();
-          const seen = new Set();
-          const sibs = allRoutes
-            .filter(r => r.date === todayDate && r.agency_name === agencyName && !seen.has(r.line_ref) && (seen.add(r.line_ref), true))
-            .map(r => {
-              const c = extractCities(r.route_long_name);
-              return { lineRef: r.line_ref, from: c.from, to: c.to, direction: r.route_direction, alternative: r.route_alternative };
-            });
-          if (sibs.length > 1) {
-            setTracked(prev => prev ? { ...prev, siblings: sibs } : prev);
-          }
-        } catch (e) { /* non-critical */ }
-      }
-
-      // Fetch vehicles
       await refreshVehicles(lineRefs);
-
-      // Poll
       vehicleTimer.current = setInterval(() => refreshVehicles(lineRefs), 30000);
     } catch (e) { console.error('Track:', e); }
-    setLoading(false);
   }
 
   // Recalculate closest stop by walking distance (OSRM table API)
@@ -710,7 +686,7 @@ export default function App() {
         if (currentDir) {
           // Get GTFS route IDs for sibling line_refs
           const sibRefs = tracked.siblings.filter(s => s.direction === currentDir).map(s => s.lineRef);
-          const sibRoutes = await api('/gtfs_routes/list', { line_refs: sibRefs.join(','), date: today(), limit: 50, order_by: 'date desc' });
+          const sibRoutes = await apiFetch('/gtfs_routes/list', { line_refs: sibRefs.join(','), date: today(), limit: 50, order_by: 'date desc' });
           const todayDate = today();
           for (const r of sibRoutes) {
             if (r.date === todayDate && !routeIds.includes(r.id)) routeIds.push(r.id);
@@ -728,7 +704,7 @@ export default function App() {
       for (let dayOffset = 1; dayOffset <= 3; dayOffset++) {
         const futureDay = new Date(Date.now() + dayOffset * 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
         try {
-          const futureRoutes = await api('/gtfs_routes/list', { line_refs: allLineRefs.join(','), date: futureDay, limit: 50, order_by: 'date desc' });
+          const futureRoutes = await apiFetch('/gtfs_routes/list', { line_refs: allLineRefs.join(','), date: futureDay, limit: 50, order_by: 'date desc' });
           const futureIds = futureRoutes.filter(r => r.date === futureDay).map(r => r.id);
           if (futureIds.length) {
             const futureRides = (await Promise.allSettled(
