@@ -908,7 +908,7 @@ export default function App() {
               <button className="float-btn" onClick={goHome}><BackIcon color="var(--text1)" /></button>
               <div className="float-pill">
                 <span className="float-badge" style={{ background: opColor }}>{tracked.lineName}</span>
-                <span className="float-pill-text" style={{ fontSize: 13 }}>{tracked.agencyName}</span>
+                <span className="float-pill-text" style={{ fontSize: 13 }}>{tracked.from ? fmtDir(tracked.from, tracked.to) : tracked.agencyName}</span>
               </div>
               <button className="float-btn" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
                 {theme === 'dark' ? <SunIcon color="var(--text2)" /> : <MoonIcon color="var(--text2)" />}
