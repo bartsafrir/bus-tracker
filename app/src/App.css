@@ -385,6 +385,10 @@ body {
   font-size: 15px; font-weight: 600; color: var(--text1);
   font-variant-numeric: tabular-nums; direction: ltr;
 }
+.sc-tomorrow {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  color: var(--orange); margin-right: 4px; direction: rtl;
+}
 
 /* ═══ NEARBY GRID ═══ */
 .nearby-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px 20px 16px; }

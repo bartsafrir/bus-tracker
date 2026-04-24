@@ -2,14 +2,16 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 60000,
-  expect: { timeout: 15000 },
+  timeout: 45000,
+  expect: { timeout: 10000 },
+  fullyParallel: true,
+  workers: 4,
   use: {
     baseURL: 'http://localhost:4173',
     viewport: { width: 390, height: 844 },
     locale: 'he-IL',
     timezoneId: 'Asia/Jerusalem',
-    geolocation: { latitude: 32.794, longitude: 34.990 }, // Haifa
+    geolocation: { latitude: 32.794, longitude: 34.990 },
     permissions: ['geolocation'],
   },
   webServer: {
@@ -18,6 +20,6 @@ export default defineConfig({
     reuseExistingServer: true,
   },
   projects: [
-    { name: 'mobile', use: { ...{ isMobile: true } } },
+    { name: 'mobile', use: { isMobile: true } },
   ],
 });

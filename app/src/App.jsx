@@ -500,25 +500,32 @@ export default function App() {
     }
     setClosestStop(quickCl);
 
-    // Then: get real walking distances from OSRM (top 20 nearest by straight line)
+    // Then: get real walking distances from OSRM (ALL stops within 2km straight line)
     async function calcWalkDist() {
+      const maxDist = 2000; // 2km
       const ranked = stops
         .map(s => ({ s, d: distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon) }))
+        .filter(r => r.d < maxDist)
         .sort((a, b) => a.d - b.d)
-        .slice(0, 20);
+        .slice(0, 25);
+
+      if (!ranked.length) return;
 
       const pts = [`${savedLoc.lon},${savedLoc.lat}`, ...ranked.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)].join(';');
       try {
-        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=distance`);
+        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=duration`);
         const data = await res.json();
-        if (cancelled || data.code !== 'Ok' || !data.distances?.[0]) return;
+        if (cancelled || data.code !== 'Ok' || !data.durations?.[0]) return;
 
-        const distances = data.distances[0];
-        let bestIdx = -1, bestDist = Infinity;
-        for (let i = 1; i < distances.length; i++) {
-          if (distances[i] != null && distances[i] < bestDist) { bestDist = distances[i]; bestIdx = i - 1; }
+        const durations = data.durations[0]; // walking seconds from user to each stop
+        let bestIdx = -1, bestTime = Infinity;
+        for (let i = 1; i < durations.length; i++) {
+          if (durations[i] != null && durations[i] < bestTime) { bestTime = durations[i]; bestIdx = i - 1; }
         }
-        if (bestIdx >= 0) setClosestStop(ranked[bestIdx].s);
+        if (bestIdx >= 0 && ranked[bestIdx].s.id !== quickCl?.id) {
+          console.log(`OSRM: closest by walk = ${ranked[bestIdx].s.gtfs_stop__name} (${Math.round(bestTime/60)}min), was ${quickCl?.gtfs_stop__name}`);
+          setClosestStop(ranked[bestIdx].s);
+        }
       } catch (e) { console.warn('OSRM table error:', e); }
     }
     calcWalkDist();
@@ -1242,18 +1249,23 @@ export default function App() {
                 const upcoming = [];
                 let foundNext = false;
 
+                // Detect if arrival is "tomorrow" in Israel time
+                const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+
                 for (const a of schedule) {
                   // Use real timestamp diff, not minutes-of-day (handles midnight correctly)
                   const isPast = a.passed || (!a.live && a.diffMin < -2);
                   if (isPast) { past.push(a); continue; }
                   const mins = a.live && a.liveEta != null ? a.liveEta : Math.max(0, a.diffMin);
+                  const arrDateIL = new Date(a.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+                  const isTomorrow = arrDateIL > todayIL;
                   const isLive = !!a.live;
                   const cantCatch = walkMin != null && mins < walkMin;
                   const tooClose = cantCatch;
                   const isNext = !tooClose && !foundNext;
                   if (isNext) foundNext = true;
 
-                  upcoming.push({ ...a, mins, isNext, isLive, tooClose });
+                  upcoming.push({ ...a, mins, isNext, isLive, tooClose, isTomorrow });
                 }
 
                 return (
@@ -1282,7 +1294,7 @@ export default function App() {
                                 {a.stopsAway && <span className="sc-stops">{a.stopsAway} תחנות</span>}
                               </div>
                               <div className="sc-clock-col">
-                                <div className="sc-clock-sched">{a.str}</div>
+                                <div className="sc-clock-sched">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</div>
                               </div>
                             </div>
                           </div>
@@ -1303,7 +1315,7 @@ export default function App() {
                               {a.tooClose && <span className="sc-miss">לא תספיק</span>}
                             </div>
                             <div className="sc-clock-col">
-                              <div className="sc-clock-sched">{a.str}</div>
+                              <div className="sc-clock-sched">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</div>
                             </div>
                           </div>
                         );
@@ -1321,7 +1333,7 @@ export default function App() {
                             {a.tooClose && <span className="sc-miss">לא תספיק</span>}
                           </div>
                           <div className="sc-clock-col">
-                            <span className="sc-clock-time">{a.str}</span>
+                            <span className="sc-clock-time">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</span>
                           </div>
                         </div>
                       );
