@@ -464,29 +464,19 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Snap route to roads (cached across page refreshes)
+        // Snap route to roads via OSRM route (fast, cached across refreshes)
         (async () => {
           const cached = getCachedRoute(stopCoords, 'bus');
           if (cached) { setRouteCoords(cached); return; }
           try {
-            const CHUNK = 8;
-            const allPts = [];
-            for (let i = 0; i < stopCoords.length; i += CHUNK - 1) {
-              const chunk = stopCoords.slice(i, i + CHUNK);
-              const pts = chunk.map(c => `${c[1]},${c[0]}`).join(';');
-              const radii = chunk.map(() => '25').join(';');
-              const ts = chunk.map((_, j) => (i + j) * 60).join(';');
-              const res = await fetch(`https://router.project-osrm.org/match/v1/driving/${pts}?overview=full&geometries=geojson&radiuses=${radii}&timestamps=${ts}`);
-              const data = await res.json();
-              if (data.matchings) {
-                for (const m of data.matchings) {
-                  const coords = m.geometry.coordinates.map(c => [c[1], c[0]]);
-                  allPts.push(...(allPts.length ? coords.slice(1) : coords));
-                }
-              }
-              if (i + CHUNK >= stopCoords.length) break;
+            const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true`);
+            const data = await res.json();
+            if (data.routes?.[0]?.geometry?.coordinates) {
+              const path = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              setRouteCoords(path);
+              setCachedRoute(stopCoords, 'bus', path);
             }
-            if (allPts.length > 1) { setRouteCoords(allPts); setCachedRoute(stopCoords, 'bus', allPts); }
           } catch { /* keep straight lines as fallback */ }
         })();
 
