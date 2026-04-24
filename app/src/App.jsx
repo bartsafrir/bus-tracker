@@ -469,8 +469,15 @@ export default function App() {
           const cached = getCachedRoute(stopCoords, 'bus');
           if (cached) { setRouteCoords(cached); return; }
           try {
-            const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
-            const approaches = stopCoords.map(() => 'unrestricted').join(';');
+            // Thin stops: skip stops < 80m from previous (on same road, cause loops)
+            const thinned = [stopCoords[0]];
+            for (let i = 1; i < stopCoords.length; i++) {
+              const prev = thinned[thinned.length - 1];
+              const d = distanceM(prev[0], prev[1], stopCoords[i][0], stopCoords[i][1]);
+              if (d > 80 || i === stopCoords.length - 1) thinned.push(stopCoords[i]);
+            }
+            const pts = thinned.map(c => `${c[1]},${c[0]}`).join(';');
+            const approaches = thinned.map(() => 'unrestricted').join(';');
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true&approaches=${approaches}`);
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
