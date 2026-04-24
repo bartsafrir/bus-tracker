@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>מעקב אוטובוסים בזמן אמת</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #f5f5f5; color: #333; height: 100dvh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        .header {
+            background: #1a73e8; color: white; padding: 12px 16px;
+            display: flex; align-items: center; gap: 8px;
+            z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .header h1 { font-size: 16px; font-weight: 600; white-space: nowrap; }
+        .search-box { flex: 1; display: flex; gap: 8px; }
+        .search-box input {
+            flex: 1; padding: 8px 12px; border: none; border-radius: 8px;
+            font-size: 16px; outline: none; min-width: 0; direction: ltr; text-align: center;
+        }
+        .search-box button, .locate-btn {
+            padding: 8px 16px; background: #fff; color: #1a73e8; border: none;
+            border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
+        .locate-btn { padding: 8px 10px; font-size: 18px; line-height: 1; }
+        .search-box button:active, .locate-btn:active { background: #e8e8e8; }
+
+        #map { flex: 1; width: 100%; }
+
+        .status-bar {
+            background: #fff; padding: 8px 16px; font-size: 13px; color: #666;
+            display: flex; justify-content: space-between; align-items: center;
+            border-top: 1px solid #e0e0e0; z-index: 1000;
+        }
+        .status-bar .count { font-weight: 600; color: #1a73e8; }
+        .status-bar .refresh { color: #999; font-size: 12px; }
+
+        .picker-overlay {
+            display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3); z-index: 1001;
+        }
+        .picker-overlay.visible { display: block; }
+        .picker {
+            position: absolute; bottom: 0; left: 0; right: 0; max-height: 70vh;
+            background: white; border-radius: 16px 16px 0 0;
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+            overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+        .picker-header {
+            padding: 16px; font-weight: 600; font-size: 15px; border-bottom: 1px solid #eee;
+            position: sticky; top: 0; background: white; border-radius: 16px 16px 0 0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .picker-header .close-btn {
+            background: none; border: none; font-size: 22px; cursor: pointer; color: #999; padding: 0 4px;
+        }
+        .picker-item {
+            padding: 14px 16px; cursor: pointer; display: flex; align-items: center;
+            gap: 12px; border-bottom: 1px solid #f5f5f5;
+        }
+        .picker-item:active { background: #f5f5f5; }
+        .picker-item .icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+        .picker-item .icon.operator { background: #e8f0fe; color: #1a73e8; }
+        .picker-item .icon.direction { background: #e6f4ea; color: #34a853; }
+        .picker-item .icon.nearby-line {
+            background: #1a73e8; color: white; font-size: 14px; font-weight: 700;
+            border-radius: 8px; min-width: 40px; padding: 0 4px;
+        }
+        .picker-item .info { flex: 1; min-width: 0; }
+        .picker-item .info .title { font-size: 14px; font-weight: 500; line-height: 1.4; }
+        .picker-item .info .subtitle { font-size: 12px; color: #888; margin-top: 2px; }
+        .picker-item .eta {
+            text-align: left; flex-shrink: 0; min-width: 55px;
+        }
+        .picker-item .eta .minutes {
+            font-size: 20px; font-weight: 700; color: #1a73e8; line-height: 1;
+        }
+        .picker-item .eta .label { font-size: 11px; color: #999; }
+        .picker-item .arrow { color: #ccc; font-size: 18px; }
+
+        .loading-overlay {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); background: white; padding: 20px 32px;
+            border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 1002; font-size: 14px; text-align: center;
+        }
+        .loading-overlay.visible { display: block; }
+        .spinner {
+            width: 32px; height: 32px; border: 3px solid #e0e0e0;
+            border-top-color: #1a73e8; border-radius: 50%;
+            animation: spin 0.8s linear infinite; margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .bus-icon {
+            display: flex; align-items: center; justify-content: center;
+            width: 32px; height: 32px; position: relative;
+        }
+        .bus-icon .bus-dot {
+            width: 14px; height: 14px; background: #1a73e8; border: 2px solid white;
+            border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        .bus-icon .bus-arrow {
+            position: absolute; top: -2px; left: 50%; transform: translateX(-50%);
+            width: 0; height: 0; border-left: 5px solid transparent;
+            border-right: 5px solid transparent; border-bottom: 8px solid #1a73e8;
+        }
+
+        .me-marker {
+            width: 20px; height: 20px; background: #4285f4; border: 3px solid white;
+            border-radius: 50%; box-shadow: 0 0 0 2px rgba(66,133,244,0.3), 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .stop-dot {
+            width: 10px; height: 10px; background: white; border: 2px solid #1a73e8;
+            border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .stop-dot.closest {
+            width: 18px; height: 18px; background: #fbbc04; border: 3px solid white;
+            box-shadow: 0 0 0 2px #fbbc04, 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .pin-banner {
+            display: none; position: absolute; top: 60px; left: 12px; right: 12px;
+            background: #333; color: white; padding: 10px 16px; border-radius: 10px;
+            font-size: 14px; text-align: center; z-index: 1001;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .pin-banner.visible { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .pin-banner .cancel-pin {
+            background: rgba(255,255,255,0.2); border: none; color: white;
+            padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+        }
+
+        #map.pin-mode { cursor: crosshair !important; }
+
+        .route-status {
+            display: inline-block; font-size: 10px; font-weight: 600;
+            padding: 2px 8px; border-radius: 4px; margin-top: 4px;
+        }
+        .route-status.active { background: #e6f4ea; color: #137333; }
+        .route-status.inactive { background: #f1f3f4; color: #999; }
+        .route-status.sparse { background: #fef7e0; color: #b06000; }
+        .picker-item .hours { font-size: 11px; color: #888; direction: ltr; display: inline; }
+
+        .schedule-list { padding: 8px 0; }
+        .schedule-item {
+            padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .schedule-item .time {
+            font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;
+            min-width: 50px; direction: ltr; color: #333;
+        }
+        .schedule-item .time.past { color: #ccc; text-decoration: line-through; }
+        .schedule-item .time.next { color: #1a73e8; }
+        .schedule-item .countdown {
+            font-size: 12px; color: #999; min-width: 60px;
+        }
+        .schedule-item .countdown.next { color: #1a73e8; font-weight: 600; }
+        .schedule-item .countdown.live { color: #34a853; font-weight: 600; }
+        .schedule-item .live-badge {
+            display: inline-block; background: #34a853; color: white;
+            font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+            margin-right: 6px; vertical-align: middle; letter-spacing: 0.5px;
+        }
+        .schedule-item .passed-badge {
+            display: inline-block; background: #dadce0; color: #666;
+            font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px;
+            margin-right: 6px; vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚌</h1>
+        <div class="search-box">
+            <input type="text" id="lineInput" placeholder="מספר קו" inputmode="text" autocomplete="off">
+            <button id="searchBtn">חפש</button>
+        </div>
+        <button class="locate-btn" id="locateBtn" title="קווים קרובים אליי">📍</button>
+    </div>
+
+    <div id="map"></div>
+
+    <div class="status-bar">
+        <span id="statusText">הזן מספר קו או לחץ 📍</span>
+        <span class="refresh" id="refreshText"></span>
+    </div>
+
+    <div class="picker-overlay" id="pickerOverlay">
+        <div class="picker" id="picker">
+            <div class="picker-header">
+                <span id="pickerTitle">בחר מפעיל</span>
+                <button class="close-btn" id="closePickerBtn">&times;</button>
+            </div>
+            <div id="pickerContent"></div>
+        </div>
+    </div>
+
+    <div class="pin-banner" id="pinBanner">
+        <span>📍 לחץ על המפה לבחירת מיקום</span>
+        <button class="cancel-pin" id="cancelPinBtn">ביטול</button>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <div id="loadingText">מחפש...</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API = 'https://open-bus-stride-api.hasadna.org.il';
+
+        const map = L.map('map', { zoomControl: false }).setView([31.77, 35.21], 8);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 20, subdomains: 'abcd'
+        }).addTo(map);
+
+        let busMarkers = [];
+        let stopMarkers = [];
+        let routeLine = null;
+        let meMarker = null;
+        let closestStopMarker = null;
+        let refreshInterval = null;
+        let currentLineRefs = [];
+        let currentLineName = '';
+        let routeNameCache = new Map();
+        let todayGtfsRouteId = null;
+        let referenceRideStart = null;
+        let stopOffsets = new Map();
+        let allRideStarts = null;
+
+        // Restore saved manual location
+        function saveUserLocation(lat, lon) {
+            localStorage.setItem('userLocation', JSON.stringify({ lat, lon }));
+        }
+        function getSavedLocation() {
+            try { return JSON.parse(localStorage.getItem('userLocation')); } catch { return null; }
+        }
+        function getUserLatLon() {
+            if (meMarker) { const ll = meMarker.getLatLng(); return { lat: ll.lat, lon: ll.lng }; }
+            return null;
+        }
+        function placeUserMarker(lat, lon) {
+            if (meMarker) map.removeLayer(meMarker);
+            meMarker = L.marker([lat, lon], {
+                icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [20, 20], iconAnchor: [10, 10] })
+            }).addTo(map);
+        }
+        // Restore on load
+        { const saved = getSavedLocation(); if (saved) placeUserMarker(saved.lat, saved.lon); }
+
+        const $ = id => document.getElementById(id);
+        const lineInput = $('lineInput'), searchBtn = $('searchBtn');
+        const statusText = $('statusText'), refreshText = $('refreshText');
+        const pickerOverlay = $('pickerOverlay'), pickerTitle = $('pickerTitle');
+        const pickerContent = $('pickerContent'), loading = $('loading'), loadingText = $('loadingText');
+
+        searchBtn.addEventListener('click', searchLine);
+        lineInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchLine(); });
+        $('closePickerBtn').addEventListener('click', closePicker);
+        pickerOverlay.addEventListener('click', e => { if (e.target === pickerOverlay) closePicker(); });
+        $('locateBtn').addEventListener('click', showLocateOptions);
+        $('cancelPinBtn').addEventListener('click', exitPinMode);
+
+        function closePicker() { pickerOverlay.classList.remove('visible'); }
+        function showLoading(show, text) { if (text) loadingText.textContent = text; loading.classList.toggle('visible', show); }
+        function todayStr() { return new Date().toISOString().split('T')[0]; }
+        function formatTime(iso) { return new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+
+        function clearMap() {
+            busMarkers.forEach(m => map.removeLayer(m));
+            busMarkers = [];
+            stopMarkers.forEach(m => map.removeLayer(m));
+            stopMarkers = [];
+            if (closestStopMarker) { map.removeLayer(closestStopMarker); closestStopMarker = null; }
+            if (routeLine) { map.removeLayer(routeLine); routeLine = null; }
+        }
+
+        function createBusIcon(bearing) {
+            const r = bearing != null ? bearing : 0;
+            return L.divIcon({
+                className: '',
+                html: `<div class="bus-icon" style="transform:rotate(${r}deg)"><div class="bus-arrow"></div><div class="bus-dot"></div></div>`,
+                iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -16]
+            });
+        }
+
+        async function apiFetch(endpoint, params) {
+            const url = new URL(`${API}${endpoint}`);
+            for (const [k, v] of Object.entries(params)) {
+                if (v != null) url.searchParams.set(k, v);
+            }
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 12000);
+            try {
+                const res = await fetch(url, { signal: ctrl.signal });
+                if (!res.ok) throw new Error(`${res.status}`);
+                return await res.json();
+            } finally { clearTimeout(t); }
+        }
+
+        // Haversine distance in meters
+        function distanceM(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        // Check if bus bearing roughly points toward user (within 90 degrees)
+        function isMovingToward(busLat, busLon, busBearing, userLat, userLon) {
+            if (busBearing == null) return true; // unknown = maybe
+            const angleTo = Math.atan2(userLon - busLon, userLat - busLat) * 180 / Math.PI;
+            const normalizedAngle = ((angleTo % 360) + 360) % 360;
+            let diff = Math.abs(normalizedAngle - busBearing);
+            if (diff > 180) diff = 360 - diff;
+            return diff < 90;
+        }
+
+        function parseRouteName(name) {
+            const cleaned = name.replace(/-\d+[#0-9א-ת]*$/, '');
+            const [from, to] = cleaned.split('<->').map(s => s.trim());
+            return { from: from || cleaned, to: to || '' };
+        }
+
+        // ═══════════════ SEARCH ═══════════════
+        async function searchLine() {
+            const lineName = lineInput.value.trim();
+            if (!lineName) return;
+            lineInput.blur();
+            showLoading(true, 'מחפש קו...');
+            closePicker();
+
+            try {
+                const routes = await apiFetch('/gtfs_routes/list', {
+                    route_short_name: lineName, date: todayStr(), limit: 100, order_by: 'date desc'
+                });
+
+                if (!routes.length) { showLoading(false); statusText.textContent = `לא נמצא קו ${lineName}`; return; }
+
+                // Keep only today's date entries, deduplicate by line_ref
+                const today = todayStr();
+                const unique = [], seen = new Set();
+                for (const r of routes) {
+                    if (r.date === today && !seen.has(r.line_ref)) { seen.add(r.line_ref); unique.push(r); }
+                }
+                // Fallback: if no today entries, use whatever we got
+                if (!unique.length) {
+                    for (const r of routes) { if (!seen.has(r.line_ref)) { seen.add(r.line_ref); unique.push(r); } }
+                }
+
+                currentLineName = lineName;
+
+                // Fetch operating hours for all routes in parallel
+                showLoading(true, 'טוען פרטי קווים...');
+                const enriched = await enrichRoutesWithHours(unique);
+
+                showLoading(false);
+
+                // Group by operator (route_mkt groups the "real" line)
+                const byOp = new Map();
+                for (const r of enriched) {
+                    if (!byOp.has(r.agency_name)) byOp.set(r.agency_name, []);
+                    byOp.get(r.agency_name).push(r);
+                }
+
+                if (byOp.size === 1) {
+                    const [opName, opRoutes] = [...byOp.entries()][0];
+                    if (opRoutes.length === 1) {
+                        currentLineRefs = [opRoutes[0].line_ref];
+                        startTracking(opRoutes);
+                    } else {
+                        showDirectionPicker(opName, opRoutes);
+                    }
+                } else {
+                    showOperatorPicker(byOp);
+                }
+            } catch (err) { console.error(err); showLoading(false); statusText.textContent = 'שגיאה בחיפוש'; }
+        }
+
+        // Fetch first/last ride times for each route
+        async function enrichRoutesWithHours(routes) {
+            const results = await Promise.allSettled(
+                routes.map(async r => {
+                    const [first, last] = await Promise.all([
+                        apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time asc' }),
+                        apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time desc' })
+                    ]);
+                    const firstTime = first[0]?.start_time ? toIsraelTime(new Date(first[0].start_time)) : null;
+                    const lastTime = last[0]?.start_time ? toIsraelTime(new Date(last[0].start_time)) : null;
+                    const rideCount = first.length && last.length ? null : 0; // approximate
+                    // Count total rides
+                    const allRides = await apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 200 });
+                    const count = allRides.filter(rd => rd.start_time).length;
+                    return { ...r, firstTime, lastTime, rideCount: count };
+                })
+            );
+            return results.map((res, i) => {
+                if (res.status === 'fulfilled') return res.value;
+                return { ...routes[i], firstTime: null, lastTime: null, rideCount: 0 };
+            });
+        }
+
+        function getRouteStatus(route) {
+            const nowMin = israelNow();
+            if (!route.firstTime || !route.lastTime || route.rideCount === 0) {
+                return { label: 'לא פעיל היום', cls: 'inactive' };
+            }
+            if (route.rideCount <= 3) {
+                const isActive = nowMin >= route.firstTime.minutes && nowMin <= route.lastTime.minutes + 60;
+                return { label: `${route.rideCount} נסיעות בלבד`, cls: isActive ? 'sparse' : 'inactive' };
+            }
+            const isActive = nowMin >= route.firstTime.minutes - 10 && nowMin <= route.lastTime.minutes + 60;
+            return isActive
+                ? { label: 'פעיל עכשיו', cls: 'active' }
+                : { label: 'לא פעיל כרגע', cls: 'inactive' };
+        }
+
+        function extractCities(longName) {
+            // "יצחק אלחנן/הכובשים-תל אביב יפו<->ת. מרכזית רחובות/רציפים-רחובות-10"
+            const cleaned = longName.replace(/-\d+[#0-9א-ת]*$/, '');
+            const parts = cleaned.split('<->');
+            if (parts.length !== 2) return { from: '', to: '', fromCity: '', toCity: '' };
+            // City is usually after the last dash in each part
+            const extractCity = s => {
+                const m = s.match(/-([^-<>]+)$/);
+                return m ? m[1].trim() : s.trim();
+            };
+            const fromStop = parts[0].replace(/-[^-]+$/, '').trim();
+            const toStop = parts[1].replace(/-[^-]+$/, '').trim();
+            return {
+                from: fromStop, to: toStop,
+                fromCity: extractCity(parts[0]),
+                toCity: extractCity(parts[1])
+            };
+        }
+
+        // ═══════════════ PICKERS ═══════════════
+        function showOperatorPicker(byOp) {
+            pickerTitle.textContent = `קו ${currentLineName} — בחר מפעיל`;
+            pickerContent.innerHTML = '';
+
+            const userPos = getUserLatLon();
+
+            // Sort operators: active first, then by proximity if we have location
+            const opEntries = [...byOp.entries()].sort((a, b) => {
+                const aActive = a[1].some(r => getRouteStatus(r).cls === 'active');
+                const bActive = b[1].some(r => getRouteStatus(r).cls === 'active');
+                if (aActive !== bActive) return aActive ? -1 : 1;
+                // By ride count (more rides = more relevant)
+                const aCount = a[1].reduce((s, r) => s + (r.rideCount || 0), 0);
+                const bCount = b[1].reduce((s, r) => s + (r.rideCount || 0), 0);
+                return bCount - aCount;
+            });
+
+            for (const [opName, routes] of opEntries) {
+                const cities = extractCities(routes[0].route_long_name);
+                const status = getRouteStatus(routes.find(r => getRouteStatus(r).cls === 'active') || routes[0]);
+                const hoursStr = routes[0].firstTime && routes[0].lastTime
+                    ? `${routes[0].firstTime.str} - ${routes[0].lastTime.str}` : '';
+
+                const item = document.createElement('div');
+                item.className = 'picker-item';
+                item.innerHTML = `
+                    <div class="icon operator">🚌</div>
+                    <div class="info">
+                        <div class="title">${opName}</div>
+                        <div class="subtitle">${cities.fromCity} ↔ ${cities.toCity}${hoursStr ? ' · <span class="hours">' + hoursStr + '</span>' : ''}</div>
+                        <span class="route-status ${status.cls}">${status.label}</span>
+                    </div>
+                    <div class="arrow">&lsaquo;</div>`;
+                item.onclick = () => showDirectionPicker(opName, routes);
+                pickerContent.appendChild(item);
+            }
+            pickerOverlay.classList.add('visible');
+        }
+
+        function showDirectionPicker(opName, routes) {
+            pickerTitle.textContent = `קו ${currentLineName} · ${opName}`;
+            pickerContent.innerHTML = '';
+
+            // Sort: active first, then by relevance
+            const sorted = [...routes].sort((a, b) => {
+                const aStatus = getRouteStatus(a);
+                const bStatus = getRouteStatus(b);
+                const order = { active: 0, sparse: 1, inactive: 2 };
+                return (order[aStatus.cls] ?? 2) - (order[bStatus.cls] ?? 2);
+            });
+
+            if (sorted.length > 1) {
+                const activeRoutes = sorted.filter(r => getRouteStatus(r).cls !== 'inactive');
+                const allLabel = activeRoutes.length && activeRoutes.length < sorted.length
+                    ? `כל הכיוונים הפעילים (${activeRoutes.length})` : `כל הכיוונים (${sorted.length})`;
+                const allRefs = (activeRoutes.length ? activeRoutes : sorted).map(r => r.line_ref);
+                const all = document.createElement('div');
+                all.className = 'picker-item';
+                all.innerHTML = `<div class="icon direction">⟷</div><div class="info"><div class="title">${allLabel}</div></div>`;
+                all.onclick = () => { currentLineRefs = allRefs; closePicker(); startTracking(sorted.slice(0, 1)); };
+                pickerContent.appendChild(all);
+            }
+
+            for (const route of sorted) {
+                const cities = extractCities(route.route_long_name);
+                const status = getRouteStatus(route);
+                const alt = route.route_alternative && route.route_alternative !== '#' && route.route_alternative !== '0'
+                    ? ` · חלופה ${route.route_alternative}` : '';
+                const hoursStr = route.firstTime && route.lastTime
+                    ? `${route.firstTime.str} - ${route.lastTime.str}` : '';
+                const countStr = route.rideCount ? `${route.rideCount} נסיעות` : '';
+
+                const item = document.createElement('div');
+                item.className = 'picker-item';
+                item.style.opacity = status.cls === 'inactive' ? '0.5' : '1';
+                item.innerHTML = `
+                    <div class="icon direction">→</div>
+                    <div class="info">
+                        <div class="title">${cities.fromCity} → ${cities.toCity}</div>
+                        <div class="subtitle">כיוון ${route.route_direction}${alt}${hoursStr ? ' · <span class="hours">' + hoursStr + '</span>' : ''}${countStr ? ' · ' + countStr : ''}</div>
+                        <span class="route-status ${status.cls}">${status.label}</span>
+                    </div>`;
+                item.onclick = () => { currentLineRefs = [route.line_ref]; closePicker(); startTracking([route]); };
+                pickerContent.appendChild(item);
+            }
+            pickerOverlay.classList.add('visible');
+        }
+
+        // ═══════════════ TRACKING ═══════════════
+        async function startTracking(selectedRoutes) {
+            showLoading(true, 'טוען מיקומים...');
+            clearMap();
+            if (refreshInterval) clearInterval(refreshInterval);
+            try {
+                const [_, vehicles] = await Promise.all([
+                    loadRoutePath(selectedRoutes).catch(e => console.warn('Route path:', e)),
+                    fetchVehicleLocations()
+                ]);
+                renderVehicles(vehicles);
+                refreshInterval = setInterval(refreshLocations, 30000);
+            } catch (err) { console.error(err); statusText.textContent = 'שגיאה בטעינת מיקומים'; }
+            showLoading(false);
+        }
+
+        async function loadRoutePath(selectedRoutes) {
+            const lineRef = selectedRoutes[0].line_ref;
+            allRideStarts = null; // reset cache
+
+            // Find today's gtfs_route_id for correct day-of-week schedule
+            const todayRoutes = await apiFetch('/gtfs_routes/list', {
+                line_refs: lineRef, date: todayStr(), limit: 1, order_by: 'date desc'
+            });
+            todayGtfsRouteId = todayRoutes.length ? todayRoutes[0].id : null;
+
+            // Get one ride for stop coordinates + offset calculation
+            const rideParams = todayGtfsRouteId
+                ? { gtfs_route_id: todayGtfsRouteId, limit: 1 }
+                : { gtfs_route__line_refs: lineRef, limit: 1 };
+            const rides = await apiFetch('/gtfs_rides/list', rideParams);
+            if (!rides.length) return;
+
+            referenceRideStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
+
+            const stops = await apiFetch('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
+            if (!stops.length) return;
+            stops.sort((a, b) => a.stop_sequence - b.stop_sequence);
+
+            // Compute time offset and shape_dist for each stop
+            stopOffsets.clear();
+            for (const s of stops) {
+                if (s.arrival_time && s.gtfs_stop_id) {
+                    stopOffsets.set(s.gtfs_stop_id, {
+                        offsetMs: new Date(s.arrival_time).getTime() - referenceRideStart,
+                        shapeDist: s.shape_dist_traveled  // meters along route, may be null
+                    });
+                }
+            }
+
+            const validStops = stops.filter(s => s.gtfs_stop__lat && s.gtfs_stop__lon);
+            if (validStops.length < 2) return;
+
+            const coords = validStops.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
+            routeLine = L.polyline(coords, { color: '#1a73e8', weight: 4, opacity: 0.5, dashArray: '8, 8' }).addTo(map);
+
+            const userPos = meMarker ? meMarker.getLatLng() : null;
+            let closestDist = Infinity, closestStop = null;
+
+            for (const s of validStops) {
+                const name = s.gtfs_stop__name || `תחנה ${s.stop_sequence}`;
+                const city = s.gtfs_stop__city || '';
+                const label = city ? `${name}, ${city}` : name;
+
+                if (userPos) {
+                    const d = distanceM(userPos.lat, userPos.lng, s.gtfs_stop__lat, s.gtfs_stop__lon);
+                    if (d < closestDist) { closestDist = d; closestStop = s; }
+                }
+
+                const marker = L.marker([s.gtfs_stop__lat, s.gtfs_stop__lon], {
+                    icon: L.divIcon({
+                        className: '', html: '<div class="stop-dot"></div>',
+                        iconSize: [10, 10], iconAnchor: [5, 5]
+                    })
+                });
+                // On click: show schedule for this stop
+                marker.on('click', () => showStopSchedule(s));
+                marker.addTo(map);
+                stopMarkers.push(marker);
+            }
+
+            if (closestStop) {
+                const distText = closestDist < 1000
+                    ? `${Math.round(closestDist)} מ'`
+                    : `${(closestDist / 1000).toFixed(1)} ק"מ`;
+                const name = closestStop.gtfs_stop__name || `תחנה ${closestStop.stop_sequence}`;
+                const city = closestStop.gtfs_stop__city || '';
+
+                closestStopMarker = L.marker([closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon], {
+                    icon: L.divIcon({
+                        className: '', html: '<div class="stop-dot closest"></div>',
+                        iconSize: [18, 18], iconAnchor: [9, 9]
+                    }),
+                    zIndexOffset: 500
+                });
+                closestStopMarker.on('click', () => showStopSchedule(closestStop));
+                closestStopMarker.bindPopup(
+                    `<div style="direction:rtl;font-size:13px"><b>התחנה הקרובה אליך</b><br>${name}${city ? ', ' + city : ''}<br>מרחק: ${distText}</div>`,
+                    { closeButton: false }
+                ).addTo(map).openPopup();
+            }
+        }
+
+        // ═══════════════ STOP SCHEDULE ═══════════════
+
+        // Get Israel local time components
+        function israelNow() {
+            const now = new Date();
+            const parts = new Intl.DateTimeFormat('en-GB', {
+                timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', hour12: false
+            }).formatToParts(now);
+            const h = parseInt(parts.find(p => p.type === 'hour').value);
+            const m = parseInt(parts.find(p => p.type === 'minute').value);
+            return h * 60 + m;
+        }
+
+        // Convert UTC Date to Israel HH:MM string and minutes-since-midnight
+        function toIsraelTime(date) {
+            const s = date.toLocaleString('en-GB', {
+                timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit', hour12: false
+            });
+            const [hh, mm] = s.split(':').map(Number);
+            return { str: s, minutes: hh * 60 + mm };
+        }
+
+        async function loadAllRideStarts() {
+            if (allRideStarts) return allRideStarts;
+
+            if (!todayGtfsRouteId) {
+                allRideStarts = [];
+                return allRideStarts;
+            }
+
+            // Get all rides for today's route (correct day-of-week schedule)
+            const rides = await apiFetch('/gtfs_rides/list', {
+                gtfs_route_id: todayGtfsRouteId,
+                limit: 200,
+                order_by: 'start_time asc'
+            });
+
+            allRideStarts = rides
+                .filter(r => r.start_time)
+                .map(r => new Date(r.start_time).getTime());
+
+            return allRideStarts;
+        }
+
+        async function showStopSchedule(stop) {
+            const stopName = stop.gtfs_stop__name || `תחנה ${stop.stop_sequence}`;
+            const city = stop.gtfs_stop__city || '';
+            const stopId = stop.gtfs_stop_id;
+            const stopInfo = stopOffsets.get(stopId);
+
+            if (!stopInfo || !todayGtfsRouteId) return;
+
+            showLoading(true, 'טוען לוח זמנים...');
+
+            try {
+                // Load schedule and live data in parallel
+                const [rideStarts, liveVehicles] = await Promise.all([
+                    loadAllRideStarts(),
+                    fetchVehicleLocations()
+                ]);
+                showLoading(false);
+
+                // Build a map of live vehicles by their scheduled start time (HH:MM UTC)
+                const liveByStart = new Map();
+                for (const v of liveVehicles) {
+                    if (!v.siri_ride__scheduled_start_time) continue;
+                    const key = v.siri_ride__scheduled_start_time.substring(11, 16); // "HH:MM"
+                    liveByStart.set(key, v);
+                }
+
+                // Compute arrivals
+                const arrivals = rideStarts.map(startMs => {
+                    const arrivalUTC = new Date(startMs + stopInfo.offsetMs);
+                    const israel = toIsraelTime(arrivalUTC);
+                    const startKey = new Date(startMs).toISOString().substring(11, 16);
+                    const live = liveByStart.get(startKey) || null;
+
+                    // Compute live ETA if we have live data + shape distances
+                    let liveEtaMin = null;
+                    let busPassed = false;
+                    if (live && stopInfo.shapeDist != null) {
+                        const remaining = stopInfo.shapeDist - (live.distance_from_journey_start || 0);
+                        if (remaining <= -200) {
+                            busPassed = true; // bus is >200m past this stop
+                        } else if (remaining > 0 && live.velocity > 0) {
+                            liveEtaMin = Math.max(1, Math.round(remaining / (live.velocity * 1000 / 60)));
+                        } else if (remaining > 0 && live.velocity === 0) {
+                            liveEtaMin = null; // stopped, can't estimate
+                        }
+                    }
+
+                    return { ...israel, startKey, live, liveEtaMin, busPassed };
+                }).sort((a, b) => a.minutes - b.minutes);
+
+                pickerTitle.textContent = `קו ${currentLineName} · ${stopName}`;
+                pickerContent.innerHTML = '';
+
+                if (!arrivals.length) {
+                    pickerContent.innerHTML = '<div style="padding:24px;text-align:center;color:#999">לא נמצא לוח זמנים</div>';
+                    pickerOverlay.classList.add('visible');
+                    return;
+                }
+
+                const header = document.createElement('div');
+                header.style.cssText = 'padding:12px 16px;font-size:12px;color:#888;border-bottom:1px solid #eee';
+                header.textContent = (city ? `${stopName}, ${city}` : stopName) + ` · ${arrivals.length} נסיעות`;
+                pickerContent.appendChild(header);
+
+                const list = document.createElement('div');
+                list.className = 'schedule-list';
+
+                const nowMin = israelNow();
+                let foundNext = false;
+
+                for (const arr of arrivals) {
+                    const isPast = arr.busPassed || (!arr.live && arr.minutes < nowMin);
+                    const isNext = !isPast && !foundNext;
+                    if (isNext) foundNext = true;
+
+                    const diff = arr.minutes - nowMin;
+                    let countdownHtml = '';
+
+                    if (arr.live && !arr.busPassed) {
+                        // Live bus — show real-time ETA
+                        if (arr.liveEtaMin != null) {
+                            countdownHtml = `<span class="live-badge">LIVE</span><span class="countdown live">~${arr.liveEtaMin} דק'</span>`;
+                        } else {
+                            countdownHtml = `<span class="live-badge">LIVE</span><span class="countdown live">בדרך</span>`;
+                        }
+                    } else if (arr.busPassed) {
+                        countdownHtml = `<span class="passed-badge">עבר</span>`;
+                    } else if (!isPast) {
+                        if (diff === 0) countdownHtml = `<span class="countdown ${isNext ? 'next' : ''}">עכשיו</span>`;
+                        else if (diff < 60) countdownHtml = `<span class="countdown ${isNext ? 'next' : ''}">בעוד ${diff} דק'</span>`;
+                        else countdownHtml = `<span class="countdown ${isNext ? 'next' : ''}">בעוד ${Math.floor(diff/60)} שע' ${diff%60} דק'</span>`;
+                    }
+
+                    const item = document.createElement('div');
+                    item.className = 'schedule-item';
+                    item.innerHTML = `
+                        <div class="time ${isPast ? 'past' : ''} ${isNext ? 'next' : ''}">${arr.str}</div>
+                        <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;gap:4px">${countdownHtml}</div>
+                    `;
+                    list.appendChild(item);
+                }
+
+                pickerContent.appendChild(list);
+                pickerOverlay.classList.add('visible');
+
+                requestAnimationFrame(() => {
+                    const nextEl = pickerContent.querySelector('.time.next');
+                    if (nextEl) nextEl.closest('.schedule-item').scrollIntoView({ block: 'center' });
+                });
+
+            } catch (err) {
+                console.error(err);
+                showLoading(false);
+                statusText.textContent = 'שגיאה בטעינת לוח זמנים';
+            }
+        }
+
+        async function fetchVehicleLocations() {
+            const now = new Date();
+            const from = new Date(now.getTime() - 5 * 60 * 1000);
+            const results = await Promise.allSettled(
+                currentLineRefs.map(lr => apiFetch('/siri_vehicle_locations/list', {
+                    siri_routes__line_ref: lr,
+                    recorded_at_time_from: from.toISOString(),
+                    recorded_at_time_to: now.toISOString(),
+                    limit: 100
+                }))
+            );
+            const allLocs = [];
+            for (const r of results) if (r.status === 'fulfilled') allLocs.push(...r.value);
+            const byV = new Map();
+            for (const loc of allLocs) {
+                const v = loc.siri_ride__vehicle_ref;
+                if (!v) continue;
+                const prev = byV.get(v);
+                if (!prev || new Date(loc.recorded_at_time) > new Date(prev.recorded_at_time)) byV.set(v, loc);
+            }
+            return Array.from(byV.values());
+        }
+
+        function renderVehicles(vehicles) {
+            busMarkers.forEach(m => map.removeLayer(m));
+            busMarkers = [];
+            if (!vehicles.length) {
+                statusText.textContent = `קו ${currentLineName}: אין אוטובוסים פעילים כרגע`;
+                refreshText.textContent = '';
+                if (routeLine) map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+                return;
+            }
+            const bounds = routeLine ? routeLine.getBounds() : L.latLngBounds();
+            for (const v of vehicles) {
+                const marker = L.marker([v.lat, v.lon], { icon: createBusIcon(v.bearing) });
+                const speed = v.velocity != null ? `${v.velocity} קמ"ש` : '—';
+                marker.bindPopup(`<div style="direction:rtl;font-size:13px;line-height:1.6"><b>קו ${currentLineName}</b><br>רכב: ${v.siri_ride__vehicle_ref}<br>מהירות: ${speed}<br>עדכון: ${formatTime(v.recorded_at_time)}</div>`, { closeButton: false });
+                marker.addTo(map);
+                busMarkers.push(marker);
+                bounds.extend([v.lat, v.lon]);
+            }
+            if (meMarker) bounds.extend(meMarker.getLatLng());
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
+            statusText.innerHTML = `קו ${currentLineName}: <span class="count">${vehicles.length}</span> אוטובוסים`;
+            refreshText.textContent = `עדכון: ${formatTime(new Date().toISOString())}`;
+        }
+
+        async function refreshLocations() {
+            try { renderVehicles(await fetchVehicleLocations()); } catch (e) { console.error('Refresh:', e); }
+        }
+
+        // ═══════════════ LOCATE OPTIONS ═══════════════
+        let pinMode = false;
+
+        function showLocateOptions() {
+            closePicker();
+            pickerTitle.textContent = 'בחר מיקום';
+            pickerContent.innerHTML = '';
+
+            // GPS option
+            const gpsItem = document.createElement('div');
+            gpsItem.className = 'picker-item';
+            gpsItem.innerHTML = `
+                <div class="icon direction" style="background:#e8f0fe">📡</div>
+                <div class="info"><div class="title">לפי GPS</div><div class="subtitle">זיהוי מיקום אוטומטי</div></div>`;
+            gpsItem.onclick = () => { closePicker(); findNearbyBusesGPS(); };
+            pickerContent.appendChild(gpsItem);
+
+            // Pin on map option
+            const pinItem = document.createElement('div');
+            pinItem.className = 'picker-item';
+            pinItem.innerHTML = `
+                <div class="icon direction" style="background:#fce8e6;color:#d93025">📍</div>
+                <div class="info"><div class="title">בחר על המפה</div><div class="subtitle">לחץ על נקודה במפה</div></div>`;
+            pinItem.onclick = () => { closePicker(); enterPinMode(); };
+            pickerContent.appendChild(pinItem);
+
+            pickerOverlay.classList.add('visible');
+        }
+
+        function enterPinMode() {
+            pinMode = true;
+            $('pinBanner').classList.add('visible');
+            map.getContainer().classList.add('pin-mode');
+            map.once('click', onMapPinClick);
+        }
+
+        function exitPinMode() {
+            pinMode = false;
+            $('pinBanner').classList.remove('visible');
+            map.getContainer().classList.remove('pin-mode');
+            map.off('click', onMapPinClick);
+        }
+
+        function onMapPinClick(e) {
+            exitPinMode();
+            saveUserLocation(e.latlng.lat, e.latlng.lng);
+            findNearbyBusesAt(e.latlng.lat, e.latlng.lng);
+        }
+
+        // ═══════════════ NEARBY BUSES (📍) ═══════════════
+        async function findNearbyBusesGPS() {
+            showLoading(true, 'מאתר מיקום...');
+
+            let pos;
+            try {
+                pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true, timeout: 10000, maximumAge: 30000
+                    });
+                });
+            } catch (e) {
+                showLoading(false);
+                statusText.textContent = 'לא ניתן לזהות מיקום — יש לאשר הרשאת מיקום';
+                return;
+            }
+
+            findNearbyBusesAt(pos.coords.latitude, pos.coords.longitude);
+        }
+
+        async function findNearbyBusesAt(userLat, userLon) {
+            showLoading(true, 'מחפש אוטובוסים קרובים...');
+            placeUserMarker(userLat, userLon);
+
+            map.setView([userLat, userLon], 15);
+
+            try {
+                // Query all vehicles in ~1.5km box around user
+                const OFFSET = 0.015; // ~1.5km
+                const now = new Date();
+                const from = new Date(now.getTime() - 5 * 60 * 1000);
+
+                const nearby = await apiFetch('/siri_vehicle_locations/list', {
+                    lat__greater_or_equal: userLat - OFFSET,
+                    lat__lower_or_equal: userLat + OFFSET,
+                    lon__greater_or_equal: userLon - OFFSET,
+                    lon__lower_or_equal: userLon + OFFSET,
+                    recorded_at_time_from: from.toISOString(),
+                    recorded_at_time_to: now.toISOString(),
+                    limit: 200
+                });
+
+                if (!nearby.length) {
+                    showLoading(false);
+                    statusText.textContent = 'לא נמצאו אוטובוסים בקרבתך';
+                    return;
+                }
+
+                // Latest per vehicle
+                const byV = new Map();
+                for (const loc of nearby) {
+                    const v = loc.siri_ride__vehicle_ref;
+                    if (!v) continue;
+                    const prev = byV.get(v);
+                    if (!prev || new Date(loc.recorded_at_time) > new Date(prev.recorded_at_time)) byV.set(v, loc);
+                }
+
+                // Group by line_ref — keep closest bus per line
+                const byLine = new Map();
+                for (const v of byV.values()) {
+                    const lr = v.siri_route__line_ref;
+                    const dist = distanceM(userLat, userLon, v.lat, v.lon);
+                    const toward = isMovingToward(v.lat, v.lon, v.bearing, userLat, userLon);
+                    const existing = byLine.get(lr);
+                    if (!existing || dist < existing.dist) {
+                        byLine.set(lr, { ...v, dist, toward });
+                    }
+                }
+
+                // Resolve line_ref → route name from GTFS
+                const lineRefs = [...byLine.keys()];
+                const routeResults = await Promise.allSettled(
+                    // Batch in groups to avoid huge URLs
+                    chunkArray(lineRefs, 20).map(chunk =>
+                        apiFetch('/gtfs_routes/list', {
+                            line_refs: chunk.join(','), date: todayStr(), limit: 200, order_by: 'date desc'
+                        })
+                    )
+                );
+
+                const lineRefToRoute = new Map();
+                for (const r of routeResults) {
+                    if (r.status !== 'fulfilled') continue;
+                    for (const route of r.value) {
+                        if (!lineRefToRoute.has(route.line_ref)) lineRefToRoute.set(route.line_ref, route);
+                    }
+                }
+
+                // Build sorted list: approaching buses first, then by distance
+                const lines = [...byLine.values()]
+                    .map(v => {
+                        const route = lineRefToRoute.get(v.siri_route__line_ref);
+                        const name = route ? route.route_short_name : `${v.siri_route__line_ref}`;
+                        const longName = route ? route.route_long_name : '';
+                        const agency = route ? route.agency_name : '';
+                        const parsed = longName ? parseRouteName(longName) : { from: '', to: '' };
+                        // ETA estimate: distance / velocity (km/h → m/min)
+                        let etaMin = null;
+                        if (v.velocity > 0 && v.toward) {
+                            etaMin = Math.round(v.dist / (v.velocity * 1000 / 60));
+                        }
+                        return { ...v, name, agency, parsed, etaMin };
+                    })
+                    .sort((a, b) => {
+                        // Approaching buses first
+                        if (a.toward !== b.toward) return a.toward ? -1 : 1;
+                        // Then by ETA if available, otherwise by distance
+                        if (a.etaMin != null && b.etaMin != null) return a.etaMin - b.etaMin;
+                        return a.dist - b.dist;
+                    });
+
+                showLoading(false);
+                showNearbyPicker(lines, userLat, userLon);
+
+            } catch (err) {
+                console.error(err);
+                showLoading(false);
+                statusText.textContent = 'שגיאה בחיפוש אוטובוסים קרובים';
+            }
+        }
+
+        function chunkArray(arr, size) {
+            const chunks = [];
+            for (let i = 0; i < arr.length; i += size) chunks.push(arr.slice(i, i + size));
+            return chunks;
+        }
+
+        function showNearbyPicker(lines, userLat, userLon) {
+            pickerTitle.textContent = `אוטובוסים קרובים אליך`;
+            pickerContent.innerHTML = '';
+
+            if (!lines.length) {
+                pickerContent.innerHTML = '<div style="padding:24px;text-align:center;color:#999">לא נמצאו אוטובוסים בקרבתך</div>';
+                pickerOverlay.classList.add('visible');
+                return;
+            }
+
+            // Show markers on map
+            clearMap();
+            const bounds = L.latLngBounds([[userLat, userLon]]);
+
+            for (const line of lines) {
+                // Add marker
+                const marker = L.marker([line.lat, line.lon], { icon: createBusIcon(line.bearing) });
+                const speed = line.velocity != null ? `${line.velocity} קמ"ש` : '—';
+                marker.bindPopup(`<div style="direction:rtl;font-size:13px;line-height:1.6"><b>קו ${line.name}</b><br>${line.agency}<br>מהירות: ${speed}<br>מרחק: ${Math.round(line.dist)} מ'</div>`, { closeButton: false });
+                marker.addTo(map);
+                busMarkers.push(marker);
+                bounds.extend([line.lat, line.lon]);
+
+                // Picker item
+                const distText = line.dist < 1000 ? `${Math.round(line.dist)} מ'` : `${(line.dist/1000).toFixed(1)} ק"מ`;
+                const dirText = line.parsed.to ? `← ${line.parsed.to}` : '';
+                const item = document.createElement('div');
+                item.className = 'picker-item';
+
+                let etaHtml;
+                if (line.toward && line.etaMin != null && line.etaMin < 60) {
+                    etaHtml = `<div class="eta"><div class="minutes">~${line.etaMin}</div><div class="label">דקות</div></div>`;
+                } else if (line.toward) {
+                    etaHtml = `<div class="eta"><div class="minutes" style="font-size:13px;color:#34a853">מתקרב</div><div class="label">${distText}</div></div>`;
+                } else {
+                    etaHtml = `<div class="eta"><div class="minutes" style="font-size:13px;color:#999">מתרחק</div><div class="label">${distText}</div></div>`;
+                }
+
+                item.innerHTML = `
+                    <div class="icon nearby-line">${line.name}</div>
+                    <div class="info">
+                        <div class="title">${line.agency}${dirText ? ' ' + dirText : ''}</div>
+                        <div class="subtitle">${distText} · ${speed} ${line.velocity != null ? 'קמ"ש' : ''}</div>
+                    </div>
+                    ${etaHtml}`;
+
+                item.onclick = () => {
+                    // Track this specific line
+                    currentLineName = line.name;
+                    currentLineRefs = [line.siri_route__line_ref];
+                    closePicker();
+                    startTracking([{ line_ref: line.siri_route__line_ref }]);
+                };
+                pickerContent.appendChild(item);
+            }
+
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+            pickerOverlay.classList.add('visible');
+            statusText.innerHTML = `<span class="count">${lines.length}</span> קווים קרובים אליך`;
+        }
+    </script>
+</body>
+</html>

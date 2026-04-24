@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bus Tracker — Mockups</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #333;
+    padding: 20px;
+  }
+  h1 { color: white; text-align: center; font-size: 28px; margin: 20px 0 10px; }
+  .subtitle { color: #888; text-align: center; font-size: 14px; margin-bottom: 40px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(375px, 1fr));
+    gap: 40px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  .mockup-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .mockup-label {
+    color: #aaa;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .mockup-title {
+    color: white;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .mockup-desc {
+    color: #999;
+    font-size: 13px;
+    text-align: center;
+    max-width: 340px;
+    margin-bottom: 16px;
+    direction: ltr;
+    line-height: 1.5;
+  }
+  .phone {
+    width: 375px;
+    height: 740px;
+    background: white;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 150px; height: 28px;
+    background: #1a1a2e;
+    border-radius: 0 0 20px 20px;
+    z-index: 10;
+  }
+
+  /* ─── Shared ─── */
+  .status-bar {
+    height: 44px;
+    background: inherit;
+    flex-shrink: 0;
+  }
+  .map-bg {
+    background: linear-gradient(135deg, #e8f0e8 0%, #d4e4d4 30%, #e0e8d8 60%, #d8e0d0 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .map-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(45deg, transparent 48%, #c8d8c0 48%, #c8d8c0 52%, transparent 52%),
+      linear-gradient(-30deg, transparent 48%, #d0d8c8 48%, #d0d8c8 52%, transparent 52%);
+    background-size: 80px 80px, 120px 120px;
+    opacity: 0.4;
+  }
+  .map-dot {
+    position: absolute;
+    z-index: 2;
+    border-radius: 50%;
+  }
+  .map-dot.me {
+    width: 16px; height: 16px;
+    background: #4285f4;
+    border: 3px solid white;
+    box-shadow: 0 0 0 3px rgba(66,133,244,0.3);
+  }
+  .map-dot.bus {
+    width: 12px; height: 12px;
+    background: #1a73e8;
+    border: 2px solid white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .map-dot.stop {
+    width: 8px; height: 8px;
+    background: white;
+    border: 2px solid #1a73e8;
+  }
+  .map-dot.stop-my {
+    width: 14px; height: 14px;
+    background: #fbbc04;
+    border: 3px solid white;
+    box-shadow: 0 0 0 2px #fbbc04;
+  }
+  .map-route {
+    position: absolute;
+    z-index: 1;
+    border: none;
+    border-top: 3px dashed rgba(26,115,232,0.5);
+    transform: rotate(-25deg);
+  }
+  .live-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: #34a853;
+    border-radius: 50%;
+    margin-left: 4px;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .live-badge-sm {
+    display: inline-block;
+    background: #34a853;
+    color: white;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Bus Tracker — 10 Mockups</h1>
+<p class="subtitle">Tap/scroll to explore different structural approaches</p>
+
+<div class="grid">
+
+<!-- ════════════════════ 1. MAP-FIRST ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 1</div>
+  <div class="mockup-title">Map-First</div>
+  <div class="mockup-desc">Map IS the app. No screens, no tabs. Everything overlays via slide-up panels.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#e8f0e8"></div>
+    <div class="map-bg" style="flex:1; position:relative">
+      <!-- Search bar floating -->
+      <div style="position:absolute;top:12px;left:16px;right:16px;z-index:5;display:flex;gap:8px">
+        <div style="flex:1;background:white;border-radius:12px;padding:10px 16px;font-size:14px;color:#999;box-shadow:0 2px 12px rgba(0,0,0,0.15)">🔍 חפש קו או תחנה...</div>
+        <div style="width:40px;height:40px;background:white;border-radius:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.15);font-size:18px">📍</div>
+      </div>
+      <!-- Map elements -->
+      <div class="map-dot me" style="top:35%;left:45%"></div>
+      <div class="map-dot bus" style="top:25%;left:55%"></div>
+      <div class="map-dot bus" style="top:50%;left:35%"></div>
+      <div class="map-dot bus" style="top:60%;left:60%"></div>
+      <div class="map-dot stop" style="top:30%;left:40%"></div>
+      <div class="map-dot stop" style="top:40%;left:38%"></div>
+      <div class="map-dot stop-my" style="top:45%;left:42%"></div>
+      <div class="map-dot stop" style="top:55%;left:48%"></div>
+      <div class="map-route" style="top:40%;left:20%;width:200px"></div>
+      <!-- Bottom sheet peek -->
+      <div style="position:absolute;bottom:0;left:0;right:0;background:white;border-radius:16px 16px 0 0;padding:12px 16px 20px;box-shadow:0 -4px 20px rgba(0,0,0,0.1);z-index:5">
+        <div style="width:36px;height:4px;background:#ddd;border-radius:2px;margin:0 auto 14px"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="background:#1a73e8;color:white;padding:2px 10px;border-radius:6px;font-weight:700;font-size:15px">201</span>
+            <span style="font-size:13px;color:#555">אגד · → רחובות</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:15px;font-weight:700;color:#34a853">~4 דק'</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="background:#1a73e8;color:white;padding:2px 10px;border-radius:6px;font-weight:700;font-size:15px">5</span>
+            <span style="font-size:13px;color:#555">דן · → דיזנגוף</span>
+          </div>
+          <span style="font-size:14px;color:#888">16:20</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="background:#1a73e8;color:white;padding:2px 10px;border-radius:6px;font-weight:700;font-size:15px">72</span>
+            <span style="font-size:13px;color:#555">מטרופולין · → ת. רכבת</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:14px;color:#34a853">~8 דק'</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 2. GLANCEABLE ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 2</div>
+  <div class="mockup-title">Glanceable</div>
+  <div class="mockup-desc">Airport departure board. Giant ETA numbers. Instant comprehension from any distance.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#f8f9fa"></div>
+    <div style="flex:1;background:#f8f9fa;padding:16px;overflow-y:auto">
+      <div style="font-size:13px;color:#888;margin-bottom:20px;text-align:center">📍 כרמלית, תל אביב</div>
+
+      <div style="background:white;border-radius:20px;padding:24px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#1a73e8;color:white;padding:4px 14px;border-radius:10px;font-weight:800;font-size:20px">201</span>
+            <span style="font-size:13px;color:#888">אגד</span>
+          </div>
+          <span class="live-badge-sm">LIVE</span>
+        </div>
+        <div style="text-align:center;padding:12px 0">
+          <div style="font-size:72px;font-weight:800;color:#1a73e8;line-height:1">4</div>
+          <div style="font-size:18px;color:#666;margin-top:4px">דקות</div>
+        </div>
+        <div style="text-align:center;font-size:13px;color:#999">→ רחובות · הבא: 16:20 · 16:40</div>
+      </div>
+
+      <div style="background:white;border-radius:20px;padding:24px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#ea4335;color:white;padding:4px 14px;border-radius:10px;font-weight:800;font-size:20px">5</span>
+            <span style="font-size:13px;color:#888">דן</span>
+          </div>
+        </div>
+        <div style="text-align:center;padding:12px 0">
+          <div style="font-size:72px;font-weight:800;color:#333;line-height:1">12</div>
+          <div style="font-size:18px;color:#666;margin-top:4px">דקות</div>
+        </div>
+        <div style="text-align:center;font-size:13px;color:#999">→ דיזנגוף סנטר · לוח זמנים</div>
+      </div>
+
+      <div style="background:white;border-radius:20px;padding:20px;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#34a853;color:white;padding:4px 14px;border-radius:10px;font-weight:800;font-size:20px">72</span>
+            <span style="font-size:13px;color:#888">מטרופולין</span>
+          </div>
+          <div style="text-align:left">
+            <span style="font-size:32px;font-weight:800;color:#34a853">8</span>
+            <span style="font-size:14px;color:#666"> דק'</span>
+            <span class="live-dot"></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <div style="flex:1;background:white;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer">🗺️ מפה</div>
+        <div style="flex:1;background:white;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer">+ קו</div>
+        <div style="flex:1;background:white;border-radius:14px;padding:14px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer">⚙️</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 3. TIMELINE ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 3</div>
+  <div class="mockup-title">Timeline</div>
+  <div class="mockup-desc">All your lines merged into one chronological stream. Scroll = further in the future.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#1a73e8"></div>
+    <div style="background:#1a73e8;padding:12px 16px;display:flex;align-items:center;justify-content:space-between">
+      <span style="color:white;font-size:17px;font-weight:600">🚌 הנסיעות שלי</span>
+      <div style="display:flex;gap:8px">
+        <span style="background:rgba(255,255,255,0.2);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:16px">+</span>
+        <span style="background:rgba(255,255,255,0.2);width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:14px">📍</span>
+      </div>
+    </div>
+    <div style="flex:1;background:#f5f5f5;overflow-y:auto">
+      <div style="padding:12px 16px 4px;font-size:12px;font-weight:600;color:#1a73e8;letter-spacing:0.5px">מתקרבים</div>
+
+      <div style="display:flex;padding:12px 16px;gap:14px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+          <div style="font-size:28px;font-weight:800;color:#34a853;line-height:1">3</div>
+          <div style="font-size:11px;color:#34a853">דק'</div>
+        </div>
+        <div style="flex:1;background:white;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:#1a73e8;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">201</span>
+            <span style="font-size:12px;color:#888">אגד</span>
+            <span class="live-badge-sm">LIVE</span>
+          </div>
+          <div style="font-size:13px;color:#555">כרמלית → רחובות</div>
+          <div style="height:4px;background:#e0e0e0;border-radius:2px;margin-top:8px;position:relative">
+            <div style="height:4px;background:#1a73e8;border-radius:2px;width:70%"></div>
+            <div style="position:absolute;top:-3px;left:70%;width:10px;height:10px;background:#1a73e8;border:2px solid white;border-radius:50%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;padding:12px 16px;gap:14px;align-items:flex-start">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+          <div style="font-size:28px;font-weight:800;color:#34a853;line-height:1">8</div>
+          <div style="font-size:11px;color:#34a853">דק'</div>
+        </div>
+        <div style="flex:1;background:white;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:#34a853;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">72</span>
+            <span style="font-size:12px;color:#888">מטרופולין</span>
+            <span class="live-badge-sm">LIVE</span>
+          </div>
+          <div style="font-size:13px;color:#555">ת. רכבת → הרצליה</div>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px 4px;font-size:12px;font-weight:600;color:#999;letter-spacing:0.5px">בקרוב</div>
+
+      <div style="display:flex;padding:12px 16px;gap:14px;align-items:flex-start;opacity:0.8">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+          <div style="font-size:20px;font-weight:700;color:#555;line-height:1">16:20</div>
+        </div>
+        <div style="flex:1;background:white;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#1a73e8;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">201</span>
+            <span style="font-size:12px;color:#888">אגד · כרמלית → רחובות</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;padding:12px 16px;gap:14px;align-items:flex-start;opacity:0.8">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+          <div style="font-size:20px;font-weight:700;color:#555;line-height:1">16:25</div>
+        </div>
+        <div style="flex:1;background:white;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#ea4335;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">5</span>
+            <span style="font-size:12px;color:#888">דן · ת. רכבת → דיזנגוף</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;padding:12px 16px;gap:14px;align-items:flex-start;opacity:0.6">
+        <div style="display:flex;flex-direction:column;align-items:center;min-width:44px">
+          <div style="font-size:20px;font-weight:700;color:#555;line-height:1">16:40</div>
+        </div>
+        <div style="flex:1;background:white;border-radius:14px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="background:#1a73e8;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">201</span>
+            <span style="font-size:12px;color:#888">אגד</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding:12px 16px 4px;font-size:12px;font-weight:600;color:#ccc;letter-spacing:0.5px">מאוחר יותר</div>
+      <div style="padding:4px 16px 20px;font-size:13px;color:#bbb">17:00 · 17:20 · 17:40 · 18:00 ...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 4. STOP-CENTRIC ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 4</div>
+  <div class="mockup-title">Stop-Centric</div>
+  <div class="mockup-desc">You save STOPS, not lines. The app shows everything arriving at your stop.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:white"></div>
+    <div style="background:white;padding:10px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:17px;font-weight:700">📍 כרמלית</div>
+        <div style="font-size:12px;color:#888">תל אביב יפו</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span style="font-size:14px;cursor:pointer">🔄</span>
+        <span style="font-size:14px;cursor:pointer">⚙️</span>
+      </div>
+    </div>
+    <!-- Line tabs -->
+    <div style="background:white;display:flex;border-bottom:2px solid #eee;overflow-x:auto">
+      <div style="padding:12px 20px;font-size:14px;font-weight:700;color:#1a73e8;border-bottom:2px solid #1a73e8;margin-bottom:-2px;white-space:nowrap">201 <span class="live-dot"></span></div>
+      <div style="padding:12px 20px;font-size:14px;color:#888;white-space:nowrap">5</div>
+      <div style="padding:12px 20px;font-size:14px;color:#888;white-space:nowrap">72 <span class="live-dot"></span></div>
+      <div style="padding:12px 20px;font-size:14px;color:#888;white-space:nowrap">480</div>
+      <div style="padding:12px 20px;font-size:14px;color:#bbb;white-space:nowrap">+</div>
+    </div>
+    <div style="flex:1;background:#f8f9fa;overflow-y:auto">
+      <!-- Direction 1 -->
+      <div style="padding:14px 16px 8px;font-size:13px;font-weight:600;color:#555">→ רחובות</div>
+      <div style="background:white;margin:0 12px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f5f5f5">
+          <div>
+            <div style="display:flex;align-items:center;gap:6px"><span class="live-badge-sm">LIVE</span><span style="font-size:20px;font-weight:800;color:#34a853">4 דק'</span></div>
+            <div style="font-size:12px;color:#888;margin-top:2px">34 קמ"ש · 2.1 ק"מ</div>
+          </div>
+          <div style="width:80px;height:4px;background:#e0e0e0;border-radius:2px;position:relative">
+            <div style="height:4px;background:#1a73e8;border-radius:2px;width:75%"></div>
+          </div>
+        </div>
+        <div style="padding:10px 16px;display:flex;gap:16px;align-items:center">
+          <span style="font-size:14px;color:#1a73e8;font-weight:600">16:20</span>
+          <span style="font-size:14px;color:#888">16:40</span>
+          <span style="font-size:14px;color:#888">17:00</span>
+          <span style="font-size:12px;color:#bbb;margin-right:auto">+5</span>
+        </div>
+      </div>
+
+      <!-- Direction 2 -->
+      <div style="padding:14px 16px 8px;font-size:13px;font-weight:600;color:#555">← תל אביב (חזרה)</div>
+      <div style="background:white;margin:0 12px;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f5f5f5">
+          <div>
+            <div style="display:flex;align-items:center;gap:6px"><span class="live-badge-sm">LIVE</span><span style="font-size:20px;font-weight:800;color:#34a853">2 דק'</span></div>
+          </div>
+        </div>
+        <div style="padding:10px 16px;display:flex;gap:16px">
+          <span style="font-size:14px;color:#1a73e8;font-weight:600">16:15</span>
+          <span style="font-size:14px;color:#888">16:30</span>
+          <span style="font-size:14px;color:#888">16:45</span>
+        </div>
+      </div>
+
+      <!-- Other stops -->
+      <div style="padding:20px 16px 8px;font-size:13px;font-weight:600;color:#999">התחנות שלי</div>
+      <div style="display:flex;gap:8px;padding:0 12px;overflow-x:auto">
+        <div style="background:#1a73e8;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:600;white-space:nowrap">כרמלית</div>
+        <div style="background:white;padding:8px 16px;border-radius:20px;font-size:13px;color:#555;white-space:nowrap;border:1px solid #e0e0e0">ת. רכבת</div>
+        <div style="background:white;padding:8px 16px;border-radius:20px;font-size:13px;color:#555;white-space:nowrap;border:1px solid #e0e0e0">הבימה</div>
+        <div style="background:white;padding:8px 16px;border-radius:20px;font-size:13px;color:#bbb;white-space:nowrap;border:1px dashed #ddd">+ תחנה</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 5. SPLIT-VIEW ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 5</div>
+  <div class="mockup-title">Split-View</div>
+  <div class="mockup-desc">Persistent 50/50. Map on top, list below. Both always visible. Drag to resize.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#e8f0e8"></div>
+    <div class="map-bg" style="height:320px;position:relative">
+      <div class="map-dot me" style="top:40%;left:50%"></div>
+      <div class="map-dot bus" style="top:25%;left:45%"></div>
+      <div class="map-dot bus" style="top:55%;left:55%"></div>
+      <div class="map-dot stop-my" style="top:42%;left:44%"></div>
+      <div class="map-route" style="top:38%;left:15%;width:250px"></div>
+    </div>
+    <div style="height:4px;background:#e0e0e0;display:flex;align-items:center;justify-content:center;cursor:row-resize">
+      <div style="width:40px;height:4px;background:#bbb;border-radius:2px"></div>
+    </div>
+    <div style="flex:1;background:white;overflow-y:auto">
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:#1a73e8;color:white;padding:2px 8px;border-radius:5px;font-weight:700;font-size:14px">201</span>
+          <span style="font-size:13px">→ רחובות</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="live-badge-sm">LIVE</span>
+          <span style="font-size:15px;font-weight:700;color:#34a853">4 דק'</span>
+        </div>
+      </div>
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:#1a73e8;color:white;padding:2px 8px;border-radius:5px;font-weight:700;font-size:14px">201</span>
+          <span style="font-size:13px">← תל אביב</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="live-badge-sm">LIVE</span>
+          <span style="font-size:15px;font-weight:700;color:#34a853">2 דק'</span>
+        </div>
+      </div>
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:#ea4335;color:white;padding:2px 8px;border-radius:5px;font-weight:700;font-size:14px">5</span>
+          <span style="font-size:13px">→ דיזנגוף</span>
+        </div>
+        <span style="font-size:14px;color:#888">16:20</span>
+      </div>
+      <div style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="background:#34a853;color:white;padding:2px 8px;border-radius:5px;font-weight:700;font-size:14px">72</span>
+          <span style="font-size:13px">→ ת. רכבת</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="live-badge-sm">LIVE</span>
+          <span style="font-size:14px;color:#34a853">8 דק'</span>
+        </div>
+      </div>
+      <div style="padding:12px 16px;display:flex;gap:8px">
+        <div style="flex:1;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#1a73e8;font-weight:600">🔍 חפש</div>
+        <div style="flex:1;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#1a73e8;font-weight:600">★ מועדפים</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 6. COMMAND BAR ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 6</div>
+  <div class="mockup-title">Command Bar</div>
+  <div class="mockup-desc">Spotlight/Raycast style. No home screen. Just a search bar that understands everything.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#fafafa"></div>
+    <div style="flex:1;background:#fafafa;padding:20px 16px;display:flex;flex-direction:column">
+      <div style="text-align:center;font-size:40px;margin:30px 0 20px">🚌</div>
+      <div style="background:white;border-radius:16px;padding:14px 18px;box-shadow:0 4px 20px rgba(0,0,0,0.08);font-size:16px;display:flex;align-items:center;gap:10px;margin-bottom:24px">
+        <span style="color:#ccc">🔍</span>
+        <span style="color:#bbb">201, רחובות, קרוב אליי...</span>
+      </div>
+
+      <div style="font-size:12px;color:#999;font-weight:600;margin-bottom:10px;letter-spacing:0.5px">מהיר</div>
+      <div style="background:white;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05);margin-bottom:20px">
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f5f5f5">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">★</span>
+            <span style="font-size:14px;font-weight:500">201 כרמלית</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:14px;font-weight:700;color:#34a853">4 דק'</span>
+          </div>
+        </div>
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f5f5f5">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">★</span>
+            <span style="font-size:14px;font-weight:500">5 ת. רכבת</span>
+          </div>
+          <span style="font-size:14px;color:#888">16:20</span>
+        </div>
+        <div style="padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px">★</span>
+            <span style="font-size:14px;font-weight:500">72 ת. רכבת</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:14px;color:#34a853">8 דק'</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:#999;font-weight:600;margin-bottom:10px;letter-spacing:0.5px">הצעות</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div style="background:white;padding:10px 16px;border-radius:12px;font-size:13px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,0.05)">📍 קרוב אליי</div>
+        <div style="background:white;padding:10px 16px;border-radius:12px;font-size:13px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,0.05)">🗺️ מפה</div>
+        <div style="background:white;padding:10px 16px;border-radius:12px;font-size:13px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,0.05)">480</div>
+        <div style="background:white;padding:10px 16px;border-radius:12px;font-size:13px;color:#555;box-shadow:0 1px 3px rgba(0,0,0,0.05)">רחובות</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 7. CAROUSEL ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 7</div>
+  <div class="mockup-title">Carousel</div>
+  <div class="mockup-desc">Full-screen swipeable cards per favorite. Zero taps for your most-used info.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:white"></div>
+    <div style="background:white;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <div style="width:8px;height:8px;background:#ccc;border-radius:50%"></div>
+      <div style="width:8px;height:8px;background:#1a73e8;border-radius:50%"></div>
+      <div style="width:8px;height:8px;background:#ccc;border-radius:50%"></div>
+      <span style="margin-right:auto"></span>
+      <span style="font-size:14px;color:#1a73e8;cursor:pointer">+</span>
+    </div>
+    <div style="flex:1;background:#f0f2f5;padding:12px;display:flex;flex-direction:column">
+      <div style="flex:1;background:white;border-radius:24px;padding:20px;box-shadow:0 4px 20px rgba(0,0,0,0.08);display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+          <span style="background:#1a73e8;color:white;padding:6px 16px;border-radius:12px;font-weight:800;font-size:22px">201</span>
+          <div>
+            <div style="font-size:15px;font-weight:600">אגד</div>
+            <div style="font-size:12px;color:#888">כרמלית → רחובות</div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 160px;background:linear-gradient(135deg,#e8f0e8,#d4e4d4);border-radius:16px;margin:12px 0;position:relative;overflow:hidden">
+          <div style="position:absolute;top:50%;left:30%;width:10px;height:10px;background:#4285f4;border:2px solid white;border-radius:50%;box-shadow:0 0 0 2px rgba(66,133,244,0.3);z-index:2"></div>
+          <div style="position:absolute;top:35%;left:50%;width:10px;height:10px;background:#1a73e8;border:2px solid white;border-radius:50%;z-index:2"></div>
+          <div style="position:absolute;top:60%;left:65%;width:10px;height:10px;background:#1a73e8;border:2px solid white;border-radius:50%;z-index:2"></div>
+          <div style="position:absolute;top:52%;left:35%;width:12px;height:12px;background:#fbbc04;border:2px solid white;border-radius:50%;z-index:2"></div>
+        </div>
+
+        <div style="text-align:center;margin:8px 0">
+          <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:4px">
+            <span class="live-badge-sm">LIVE</span>
+          </div>
+          <div style="font-size:56px;font-weight:800;color:#1a73e8;line-height:1">~4</div>
+          <div style="font-size:16px;color:#666">דקות לתחנה שלך</div>
+        </div>
+
+        <div style="margin-top:auto;border-top:1px solid #f0f0f0;padding-top:12px">
+          <div style="font-size:12px;color:#999;margin-bottom:6px">לוח זמנים · כרמלית</div>
+          <div style="display:flex;gap:12px">
+            <span style="font-size:14px;font-weight:600;color:#1a73e8">16:00●</span>
+            <span style="font-size:14px;color:#555">16:20</span>
+            <span style="font-size:14px;color:#555">16:40</span>
+            <span style="font-size:14px;color:#bbb">17:00</span>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center;padding:12px;font-size:13px;color:#999">← החלק לקו הבא →</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 8. DARK DASHBOARD ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 8</div>
+  <div class="mockup-title">Dark Dashboard</div>
+  <div class="mockup-desc">Dense widget grid. Dark theme for outdoor readability. See everything at once.</div>
+  <div class="phone" style="background:#111827">
+    <div class="status-bar" style="background:#111827"></div>
+    <div style="flex:1;background:#111827;padding:8px;display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;justify-content:space-between;padding:4px 8px;align-items:center">
+        <span style="color:#9ca3af;font-size:13px">16:02 · יום ו'</span>
+        <div style="display:flex;gap:8px">
+          <span style="color:#9ca3af;font-size:14px">🔍</span>
+          <span style="color:#9ca3af;font-size:14px">📍</span>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:#1f2937;border-radius:16px;padding:14px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="background:#3b82f6;color:white;padding:2px 8px;border-radius:6px;font-weight:700;font-size:14px">201</span>
+            <span class="live-dot"></span>
+          </div>
+          <div style="font-size:36px;font-weight:800;color:white;line-height:1">4</div>
+          <div style="font-size:12px;color:#9ca3af">דק' → רחובות</div>
+          <div style="height:3px;background:#374151;border-radius:2px;margin-top:10px">
+            <div style="height:3px;background:#3b82f6;border-radius:2px;width:75%"></div>
+          </div>
+        </div>
+        <div style="background:#1f2937;border-radius:16px;padding:14px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="background:#ef4444;color:white;padding:2px 8px;border-radius:6px;font-weight:700;font-size:14px">5</span>
+          </div>
+          <div style="font-size:36px;font-weight:800;color:white;line-height:1">12</div>
+          <div style="font-size:12px;color:#9ca3af">דק' → דיזנגוף</div>
+          <div style="height:3px;background:#374151;border-radius:2px;margin-top:10px">
+            <div style="height:3px;background:#ef4444;border-radius:2px;width:40%"></div>
+          </div>
+        </div>
+        <div style="background:#1f2937;border-radius:16px;padding:14px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="background:#10b981;color:white;padding:2px 8px;border-radius:6px;font-weight:700;font-size:14px">72</span>
+            <span class="live-dot"></span>
+          </div>
+          <div style="font-size:36px;font-weight:800;color:white;line-height:1">8</div>
+          <div style="font-size:12px;color:#9ca3af">דק' → ת.רכבת</div>
+          <div style="height:3px;background:#374151;border-radius:2px;margin-top:10px">
+            <div style="height:3px;background:#10b981;border-radius:2px;width:55%"></div>
+          </div>
+        </div>
+        <div style="background:#1f2937;border-radius:16px;padding:14px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <span style="background:#f59e0b;color:white;padding:2px 8px;border-radius:6px;font-weight:700;font-size:14px">480</span>
+          </div>
+          <div style="font-size:36px;font-weight:800;color:white;line-height:1">22</div>
+          <div style="font-size:12px;color:#9ca3af">דק' → ירושלים</div>
+          <div style="height:3px;background:#374151;border-radius:2px;margin-top:10px">
+            <div style="height:3px;background:#f59e0b;border-radius:2px;width:20%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1;background:#1f2937;border-radius:16px;overflow:hidden;position:relative;min-height:140px">
+        <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a2a1a,#1f2f1f);opacity:0.6"></div>
+        <div style="position:absolute;top:8px;right:12px;color:#9ca3af;font-size:11px;z-index:2">מפה חיה</div>
+        <div style="position:absolute;top:40%;left:40%;width:12px;height:12px;background:#4285f4;border:2px solid white;border-radius:50%;z-index:2"></div>
+        <div style="position:absolute;top:28%;left:55%;width:8px;height:8px;background:#3b82f6;border:2px solid #1f2937;border-radius:50%;z-index:2;animation:pulse 1.5s infinite"></div>
+        <div style="position:absolute;top:55%;left:35%;width:8px;height:8px;background:#3b82f6;border:2px solid #1f2937;border-radius:50%;z-index:2;animation:pulse 1.5s infinite"></div>
+        <div style="position:absolute;top:65%;left:60%;width:8px;height:8px;background:#10b981;border:2px solid #1f2937;border-radius:50%;z-index:2;animation:pulse 1.5s infinite"></div>
+      </div>
+
+      <div style="background:#1f2937;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:12px;overflow-x:auto">
+        <span style="color:#6b7280;font-size:11px;white-space:nowrap">קרוב:</span>
+        <span style="color:white;font-size:13px;white-space:nowrap"><b>18</b> 3'</span>
+        <span style="color:white;font-size:13px;white-space:nowrap"><b>55</b> 5'</span>
+        <span style="color:white;font-size:13px;white-space:nowrap"><b>89</b> 7'</span>
+        <span style="color:white;font-size:13px;white-space:nowrap"><b>142</b> 9'</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 9. BOTTOM-SHEET NATIVE ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 9</div>
+  <div class="mockup-title">Bottom-Sheet Native</div>
+  <div class="mockup-desc">Apple Maps pattern. Map always behind, draggable sheet with 3 snap points.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#e8f0e8"></div>
+    <div class="map-bg" style="height:340px;position:relative">
+      <div class="map-dot me" style="top:40%;left:48%"></div>
+      <div class="map-dot bus" style="top:28%;left:55%"></div>
+      <div class="map-dot bus" style="top:52%;left:38%"></div>
+      <div class="map-dot bus" style="top:62%;left:58%"></div>
+      <div class="map-dot stop-my" style="top:43%;left:43%"></div>
+      <div class="map-route" style="top:42%;left:15%;width:240px"></div>
+    </div>
+    <div style="flex:1;background:white;border-radius:16px 16px 0 0;margin-top:-16px;position:relative;z-index:5;box-shadow:0 -4px 20px rgba(0,0,0,0.1);overflow-y:auto">
+      <div style="padding:8px 0 0;display:flex;justify-content:center"><div style="width:36px;height:4px;background:#ddd;border-radius:2px"></div></div>
+
+      <div style="padding:12px 16px">
+        <div style="background:#f5f5f5;border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:16px">
+          <span style="color:#bbb">🔍</span>
+          <span style="color:#bbb;font-size:14px">חפש קו או תחנה...</span>
+        </div>
+
+        <div style="font-size:13px;color:#888;font-weight:600;margin-bottom:8px">★ מועדפים</div>
+        <div style="display:flex;flex-direction:column;gap:1px;background:#f5f5f5;border-radius:12px;overflow:hidden;margin-bottom:16px">
+          <div style="background:white;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#1a73e8;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">201</span>
+              <span style="font-size:13px">כרמלית → רחובות</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span class="live-badge-sm">LIVE</span>
+              <span style="font-size:14px;font-weight:700;color:#34a853">4'</span>
+            </div>
+          </div>
+          <div style="background:white;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#ea4335;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">5</span>
+              <span style="font-size:13px">ת.רכבת → דיזנגוף</span>
+            </div>
+            <span style="font-size:14px;color:#888">16:20</span>
+          </div>
+          <div style="background:white;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="background:#34a853;color:white;padding:1px 8px;border-radius:5px;font-weight:700;font-size:13px">72</span>
+              <span style="font-size:13px">ת.רכבת → הרצליה</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span class="live-badge-sm">LIVE</span>
+              <span style="font-size:14px;color:#34a853">8'</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size:13px;color:#888;font-weight:600;margin-bottom:8px">📍 קרוב אליי</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="background:#f5f5f5;padding:6px 14px;border-radius:20px;font-size:13px"><b>18</b> 3'</span>
+          <span style="background:#f5f5f5;padding:6px 14px;border-radius:20px;font-size:13px"><b>55</b> 5'</span>
+          <span style="background:#f5f5f5;padding:6px 14px;border-radius:20px;font-size:13px"><b>89</b> 7'</span>
+          <span style="background:#f5f5f5;padding:6px 14px;border-radius:20px;font-size:13px"><b>142</b> 9'</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════ 10. STORY MODE ════════════════════ -->
+<div class="mockup-wrap">
+  <div class="mockup-label">Mockup 10</div>
+  <div class="mockup-title">Story Mode</div>
+  <div class="mockup-desc">Route as a vertical diagram. Stops are nodes, buses are moving dots. See exactly where each bus is.</div>
+  <div class="phone">
+    <div class="status-bar" style="background:#1a73e8"></div>
+    <div style="background:#1a73e8;padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
+      <span style="color:white;font-size:16px;font-weight:600">← קו 201 · אגד</span>
+      <span style="color:rgba(255,255,255,0.7);font-size:13px">תל אביב → רחובות</span>
+    </div>
+    <div style="flex:1;background:#f8f9fa;overflow-y:auto;padding:0 0 20px">
+      <!-- Route strip -->
+      <div style="padding:16px 20px 0 60px;position:relative">
+        <!-- The line -->
+        <div style="position:absolute;right:38px;top:24px;bottom:0;width:3px;background:#d0d8e8"></div>
+
+        <!-- Stop 1 -->
+        <div style="position:relative;padding:8px 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-10px;top:10px;width:14px;height:14px;background:white;border:3px solid #1a73e8;border-radius:50%;z-index:2"></div>
+          <div style="font-size:14px;font-weight:600;color:#333">כרמלית</div>
+          <div style="font-size:12px;color:#888">תל אביב</div>
+        </div>
+
+        <!-- Bus approaching -->
+        <div style="position:relative;padding:4px 0 4px;padding-right:40px">
+          <div style="position:absolute;right:-8px;top:4px;width:18px;height:18px;background:#1a73e8;border:2px solid white;border-radius:50%;z-index:3;box-shadow:0 2px 6px rgba(26,115,232,0.4)"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:16px;font-weight:700;color:#34a853">~4 דק'</span>
+            <span style="font-size:12px;color:#888">34 קמ"ש</span>
+          </div>
+        </div>
+
+        <!-- Stop 2 -->
+        <div style="position:relative;padding:20px 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-6px;top:22px;width:10px;height:10px;background:white;border:2px solid #aab;border-radius:50%;z-index:2"></div>
+          <div style="font-size:13px;color:#888">לוינסקי</div>
+        </div>
+
+        <!-- Stop 3 -->
+        <div style="position:relative;padding:0 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-6px;top:2px;width:10px;height:10px;background:white;border:2px solid #aab;border-radius:50%;z-index:2"></div>
+          <div style="font-size:13px;color:#888">פלורנטין</div>
+        </div>
+
+        <!-- Bus 2 -->
+        <div style="position:relative;padding:4px 0 4px;padding-right:40px">
+          <div style="position:absolute;right:-8px;top:4px;width:18px;height:18px;background:#1a73e8;border:2px solid white;border-radius:50%;z-index:3;box-shadow:0 2px 6px rgba(26,115,232,0.4)"></div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="live-badge-sm">LIVE</span>
+            <span style="font-size:14px;color:#34a853">~12 דק'</span>
+          </div>
+        </div>
+
+        <!-- Stop 4 -->
+        <div style="position:relative;padding:20px 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-6px;top:22px;width:10px;height:10px;background:white;border:2px solid #aab;border-radius:50%;z-index:2"></div>
+          <div style="font-size:13px;color:#888">חולון</div>
+        </div>
+
+        <!-- Stop 5 -->
+        <div style="position:relative;padding:0 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-6px;top:2px;width:10px;height:10px;background:white;border:2px solid #aab;border-radius:50%;z-index:2"></div>
+          <div style="font-size:13px;color:#888">בת ים</div>
+        </div>
+
+        <!-- MY STOP -->
+        <div style="position:relative;padding:0 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-12px;top:0;width:18px;height:18px;background:#fbbc04;border:3px solid white;border-radius:50%;z-index:2;box-shadow:0 0 0 2px #fbbc04"></div>
+          <div style="font-size:15px;font-weight:700;color:#1a73e8">ראשון לציון</div>
+          <div style="font-size:12px;color:#1a73e8">← התחנה שלך</div>
+        </div>
+
+        <!-- Stop 6 -->
+        <div style="position:relative;padding:0 0 24px;padding-right:40px">
+          <div style="position:absolute;right:-6px;top:2px;width:10px;height:10px;background:white;border:2px solid #aab;border-radius:50%;z-index:2"></div>
+          <div style="font-size:13px;color:#888">נס ציונה</div>
+        </div>
+
+        <!-- Bus passed -->
+        <div style="position:relative;padding:4px 0 4px;padding-right:40px">
+          <div style="position:absolute;right:-8px;top:4px;width:18px;height:18px;background:#9ca3af;border:2px solid white;border-radius:50%;z-index:3"></div>
+          <div style="font-size:13px;color:#9ca3af">🚌 עבר</div>
+        </div>
+
+        <!-- Stop 7 -->
+        <div style="position:relative;padding:20px 0 16px;padding-right:40px">
+          <div style="position:absolute;right:-10px;top:22px;width:14px;height:14px;background:white;border:3px solid #1a73e8;border-radius:50%;z-index:2"></div>
+          <div style="font-size:14px;font-weight:600;color:#333">ת. מרכזית רחובות</div>
+          <div style="font-size:12px;color:#888">רחובות</div>
+        </div>
+      </div>
+    </div>
+    <!-- Bottom bar -->
+    <div style="background:white;border-top:1px solid #eee;padding:10px 16px;display:flex;gap:8px">
+      <div style="flex:1;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#1a73e8;font-weight:600">🗺️ מפה</div>
+      <div style="flex:1;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#1a73e8;font-weight:600">⏱ לוח</div>
+      <div style="flex:1;background:#f5f5f5;border-radius:10px;padding:10px;text-align:center;font-size:13px;color:#1a73e8;font-weight:600">↔ כיוון</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /grid -->
+
+<div style="height:60px"></div>
+</body>
+</html>

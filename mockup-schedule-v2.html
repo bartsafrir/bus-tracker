@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Schedule — Minutes-First</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&family=Google+Sans:wght@400;500;700;800&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Google Sans Text', 'Google Sans', -apple-system, system-ui, sans-serif;
+  background: #0a0a0f;
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+}
+.col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.label { color: #555; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+.title { color: #eee; font-size: 15px; font-weight: 700; }
+.desc { color: #666; font-size: 11px; text-align: center; max-width: 340px; line-height: 1.5; direction: ltr; margin-bottom: 8px; }
+.phone {
+  width: 390px; height: 844px;
+  background: #fff;
+  border-radius: 48px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.7);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.phone::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 126px; height: 36px;
+  background: #0a0a0f;
+  border-radius: 0 0 24px 24px;
+  z-index: 99;
+}
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #30D158; color: white;
+  font-size: 9px; font-weight: 700; padding: 3px 7px; border-radius: 5px; letter-spacing: 0.5px;
+}
+.live-badge::before {
+  content: ''; width: 4px; height: 4px; background: white; border-radius: 50%;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1;transform:scale(1); } 50% { opacity:0.4;transform:scale(0.7); } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ THE DESIGN ═══════════ -->
+<div class="col">
+<div class="label">Final</div>
+<div class="title">Minutes-First</div>
+<div class="desc">Giant scannable minutes. You decide in 1 second: too soon / perfect / too late.</div>
+<div class="phone">
+  <div style="height:52px"></div>
+
+  <!-- Header -->
+  <div style="padding:14px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(0,0,0,0.04)">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:34px;height:34px;background:rgba(0,0,0,0.04);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:#8e8e93;cursor:pointer">✕</div>
+      <div>
+        <div style="font-size:17px;font-weight:700;letter-spacing:-0.3px;display:flex;align-items:center;gap:8px">
+          <span style="background:#16A34A;color:white;padding:3px 11px;border-radius:8px;font-size:15px;font-weight:800">201</span>
+          כרמלית
+        </div>
+        <div style="font-size:12px;color:#8e8e93;font-weight:500;margin-top:1px">תל אביב · אגד</div>
+      </div>
+    </div>
+    <div style="font-size:22px;color:#FF9F0A;cursor:pointer">★</div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto">
+
+    <!-- Past — collapsed -->
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:#c7c7cc;font-weight:500">22 נסיעות עברו</span>
+      <div style="flex:1;height:1px;background:#e8e8ed"></div>
+    </div>
+
+    <!-- ARRIVED / TOO CLOSE -->
+    <div style="padding:6px 24px;display:flex;align-items:center;gap:16px;opacity:0.4">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#c7c7cc;letter-spacing:-1px">1</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;color:#c7c7cc;font-weight:500">דק'</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="live-badge" style="opacity:0.6">LIVE</span>
+        <span style="font-size:12px;color:#c7c7cc;direction:ltr;font-variant-numeric:tabular-nums">14:41</span>
+      </div>
+    </div>
+
+    <!-- THE ONE — highlighted -->
+    <div style="margin:4px 16px;background:linear-gradient(135deg,rgba(48,209,88,0.08),rgba(48,209,88,0.03));border:1.5px solid rgba(48,209,88,0.2);border-radius:16px;padding:16px 20px">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="min-width:52px;text-align:center">
+          <div style="font-size:42px;font-weight:800;color:#30D158;letter-spacing:-2px;line-height:1">7</div>
+          <div style="font-size:12px;color:#248A3D;font-weight:600">דק'</div>
+        </div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <span class="live-badge">LIVE</span>
+            <span style="font-size:12px;color:#248A3D;font-weight:500">4 תחנות</span>
+          </div>
+          <!-- Progress -->
+          <div style="height:4px;background:rgba(48,209,88,0.15);border-radius:100px;position:relative;margin-top:8px">
+            <div style="height:4px;background:#30D158;border-radius:100px;width:68%"></div>
+            <div style="position:absolute;top:-4px;left:68%;width:12px;height:12px;background:#30D158;border:2px solid white;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,0.15)"></div>
+          </div>
+        </div>
+        <div style="text-align:left;min-width:44px">
+          <div style="font-size:12px;color:#c7c7cc;text-decoration:line-through;direction:ltr;font-variant-numeric:tabular-nums">14:40</div>
+          <div style="font-size:14px;font-weight:700;color:#30D158;direction:ltr;font-variant-numeric:tabular-nums">14:47</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Another LIVE -->
+    <div style="padding:14px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(0,0,0,0.04)">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#30D158;letter-spacing:-1px">28</div>
+        <div style="font-size:11px;color:#248A3D;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;gap:6px">
+        <span class="live-badge">LIVE</span>
+        <span style="font-size:12px;color:#248A3D;font-weight:500">9 תחנות</span>
+      </div>
+      <div style="text-align:left;min-width:44px">
+        <div style="font-size:12px;color:#c7c7cc;text-decoration:line-through;direction:ltr;font-variant-numeric:tabular-nums">15:00</div>
+        <div style="font-size:14px;font-weight:600;color:#30D158;direction:ltr;font-variant-numeric:tabular-nums">15:08</div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div style="padding:12px 24px 4px;display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:#8e8e93;font-weight:600">לוח זמנים</span>
+      <div style="flex:1;height:1px;background:#e8e8ed"></div>
+    </div>
+
+    <!-- Scheduled — minutes are the hero -->
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(0,0,0,0.04)">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#1a1a1a;letter-spacing:-1px">40</div>
+        <div style="font-size:11px;color:#8e8e93;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:15px;font-weight:600;color:#1a1a1a;direction:ltr;font-variant-numeric:tabular-nums">15:20</span>
+    </div>
+
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(0,0,0,0.04)">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:800;color:#1a1a1a;letter-spacing:-1px">60</div>
+        <div style="font-size:11px;color:#8e8e93;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:15px;font-weight:600;color:#1a1a1a;direction:ltr;font-variant-numeric:tabular-nums">15:40</span>
+    </div>
+
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(0,0,0,0.04)">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#c7c7cc;letter-spacing:-1px">80</div>
+        <div style="font-size:11px;color:#d1d1d6;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:15px;font-weight:500;color:#c7c7cc;direction:ltr;font-variant-numeric:tabular-nums">16:00</span>
+    </div>
+
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid rgba(0,0,0,0.04)">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#c7c7cc;letter-spacing:-1px">100</div>
+        <div style="font-size:11px;color:#d1d1d6;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:15px;font-weight:500;color:#c7c7cc;direction:ltr;font-variant-numeric:tabular-nums">16:20</span>
+    </div>
+
+    <div style="padding:12px 24px;display:flex;align-items:center;gap:16px">
+      <div style="min-width:52px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#d1d1d6;letter-spacing:-1px">120</div>
+        <div style="font-size:11px;color:#d1d1d6;font-weight:500">דק'</div>
+      </div>
+      <div style="flex:1"></div>
+      <span style="font-size:15px;font-weight:500;color:#d1d1d6;direction:ltr;font-variant-numeric:tabular-nums">16:40</span>
+    </div>
+
+    <div style="height:40px"></div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>
