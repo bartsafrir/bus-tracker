@@ -589,8 +589,33 @@ export default function App() {
     if (!info || !scheduleData?.todayGtfsRouteId) return;
 
     try {
-      const rides = await api('/gtfs_rides/list', { gtfs_route_id: scheduleData.todayGtfsRouteId, limit: 200, order_by: 'start_time asc' });
-      const starts = rides.filter(r => r.start_time).map(r => new Date(r.start_time).getTime());
+      // Get rides from ALL same-direction sibling route IDs (different alts)
+      const routeIds = [scheduleData.todayGtfsRouteId];
+      if (tracked?.siblings) {
+        const currentDir = tracked.siblings.find(s => tracked.lineRefs.includes(s.lineRef))?.direction;
+        if (currentDir) {
+          // Get GTFS route IDs for sibling line_refs
+          const sibRefs = tracked.siblings.filter(s => s.direction === currentDir).map(s => s.lineRef);
+          const sibRoutes = await api('/gtfs_routes/list', { line_refs: sibRefs.join(','), date: today(), limit: 50, order_by: 'date desc' });
+          const todayDate = today();
+          for (const r of sibRoutes) {
+            if (r.date === todayDate && !routeIds.includes(r.id)) routeIds.push(r.id);
+          }
+        }
+      }
+
+      // Fetch rides from all route IDs
+      const allRides = (await Promise.allSettled(
+        routeIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
+      )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
+
+      // Deduplicate by start_time (different alts at same time = same bus)
+      const seen = new Set();
+      const starts = allRides
+        .filter(r => r.start_time)
+        .filter(r => { const k = r.start_time; if (seen.has(k)) return false; seen.add(k); return true; })
+        .map(r => new Date(r.start_time).getTime())
+        .sort((a, b) => a - b);
 
       // Match live vehicles to schedule: by HH:MM of scheduled start time
       // Include vehicles from all same-direction alternatives
