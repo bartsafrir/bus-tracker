@@ -23,7 +23,18 @@ async function api(endpoint, params = {}) {
   } finally { clearTimeout(t); }
 }
 
-function today() { return new Date().toISOString().split('T')[0]; }
+// GTFS service day: use Israel date. After midnight Israel, late-night buses
+// are still part of the previous day's schedule until ~4am.
+function today() {
+  const now = new Date();
+  const ilHour = parseInt(now.toLocaleString('en', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }));
+  // Before 4am Israel = still the previous service day
+  if (ilHour < 4) {
+    const yesterday = new Date(now.getTime() - 86400000);
+    return yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }); // YYYY-MM-DD
+  }
+  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+}
 
 // OSRM routing — returns [[lat,lon],...] or null
 async function getRoute(coords, profile = 'driving') {
@@ -332,13 +343,21 @@ export default function App() {
   }, [routeCoords, vehicles, savedLoc]);
 
   // ═══ SEARCH ═══
+  // Auto-search with debounce
+  const searchTimer = useRef(null);
+  useEffect(() => {
+    if (view !== 'search' || !searchQuery.trim() || searchQuery.trim().length < 1) return;
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => doSearch(searchQuery), 400);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchQuery, view]);
+
   async function doSearch(term) {
     const t = (term || searchQuery).trim();
     if (!t) return;
-    setSearchQuery(t);
     setSearchLineName(t);
     setLoading(true);
-    setLoadingMsg('מחפש קו...');
+    setLoadingMsg('מחפש...');
     setSearchStep('input');
 
     try {
@@ -562,9 +581,12 @@ export default function App() {
         if (v.siri_ride__scheduled_start_time) liveByStart.set(v.siri_ride__scheduled_start_time.substring(11, 16), v);
       }
 
+      const nowMs = Date.now();
       const arr = starts.map(ms => {
-        const arrUTC = new Date(ms + info.offsetMs);
+        const arrivalMs = ms + info.offsetMs; // actual UTC timestamp of arrival
+        const arrUTC = new Date(arrivalMs);
         const il = toIsraelTime(arrUTC);
+        const diffMin = Math.round((arrivalMs - nowMs) / 60000); // real minutes from now
         const key = new Date(ms).toISOString().substring(11, 16);
         const live = liveByStart.get(key) || null;
         let liveEtaVal = null, passed = false, stopsAway = null;
@@ -573,8 +595,8 @@ export default function App() {
           if (result?.passed) passed = true;
           else if (result?.eta) { liveEtaVal = result.eta; stopsAway = result.stopsAway; }
         }
-        return { ...il, live, liveEta: liveEtaVal, passed, stopsAway };
-      }).sort((a, b) => a.minutes - b.minutes);
+        return { ...il, live, liveEta: liveEtaVal, passed, stopsAway, diffMin, arrivalMs };
+      }).sort((a, b) => a.arrivalMs - b.arrivalMs); // sort by actual time, not minutes-of-day
 
       setSchedule(arr);
     } catch (e) { console.error('Schedule:', e); }
@@ -897,13 +919,17 @@ export default function App() {
         <div className="search-overlay">
           <div className="search-bar">
             <button className="search-close" onClick={goHome}><CloseIcon size={16} /></button>
-            <input ref={searchInputRef} className="search-field" placeholder="מספר קו" inputMode="text"
+            <input ref={searchInputRef} className="search-field" placeholder="הקלד מספר קו..." inputMode="numeric"
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && doSearch()} autoFocus />
-            <button className="search-go" onClick={() => doSearch()}>חפש</button>
+            {searchQuery && (
+              <button className="search-clear" onClick={() => { setSearchQuery(''); setSearchStep('input'); setSearchOperators(null); setSearchDirections(null); searchInputRef.current?.focus(); }}>
+                <CloseIcon size={14} />
+              </button>
+            )}
           </div>
 
-          {!loading && searchStep === 'input' && (suggestions.length > 0 || recentLines.length > 0) && (
+          {!loading && searchStep === 'input' && !searchQuery.trim() && (suggestions.length > 0 || recentLines.length > 0) && (
             <>
               {suggestions.length > 0 && (
                 <>
@@ -1217,9 +1243,10 @@ export default function App() {
                 let foundNext = false;
 
                 for (const a of schedule) {
-                  const isPast = a.passed || (!a.live && a.minutes < nowMin);
+                  // Use real timestamp diff, not minutes-of-day (handles midnight correctly)
+                  const isPast = a.passed || (!a.live && a.diffMin < -2);
                   if (isPast) { past.push(a); continue; }
-                  const mins = a.live && a.liveEta != null ? a.liveEta : a.minutes - nowMin;
+                  const mins = a.live && a.liveEta != null ? a.liveEta : Math.max(0, a.diffMin);
                   const isLive = !!a.live;
                   const cantCatch = walkMin != null && mins < walkMin;
                   const tooClose = cantCatch;
