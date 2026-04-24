@@ -110,6 +110,9 @@ function latestPerVehicle(locs) {
 // APP
 // ═══════════════════════════════════════════
 export default function App() {
+  // ─── Dev mode: ?dev=1 in URL allows dragging location + pin mode ───
+  const devMode = useMemo(() => new URLSearchParams(window.location.search).has('dev'), []);
+
   // ─── Theme ───
   const [theme, setTheme] = useState(() => localStorage.getItem('bt_theme') || 'dark');
   useEffect(() => {
@@ -510,9 +513,9 @@ export default function App() {
       .then(path => setWalkRoute(path));
   }, [savedLoc, closestStop]);
 
-  // Watch GPS position continuously
+  // Watch GPS position continuously (disabled in dev mode — manual location only)
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (devMode || !navigator.geolocation) return;
     const id = navigator.geolocation.watchPosition(
       pos => saveLocation(pos.coords.latitude, pos.coords.longitude),
       () => {},
@@ -790,13 +793,13 @@ export default function App() {
           <Marker
             position={[savedLoc.lat, savedLoc.lon]}
             icon={meIcon}
-            draggable
-            eventHandlers={{
+            draggable={devMode}
+            eventHandlers={devMode ? {
               dragend: (e) => {
                 const ll = e.target.getLatLng();
                 saveLocation(ll.lat, ll.lng);
               }
-            }}
+            } : {}}
           />
         )}
       </MapContainer>
@@ -835,8 +838,8 @@ export default function App() {
         // If we have a location, just fly to it
         if (savedLoc) {
           setFlyToTrigger(t => t + 1);
-          // Also silently try to update GPS in background
-          navigator.geolocation?.getCurrentPosition(
+          // Silently update GPS in background (not in dev mode)
+          if (!devMode) navigator.geolocation?.getCurrentPosition(
             pos => saveLocation(pos.coords.latitude, pos.coords.longitude),
             () => {}, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
           );
@@ -858,13 +861,13 @@ export default function App() {
                 3: 'זמן המתנה למיקום עבר',
               };
               setLocError(msgs[err.code] || `שגיאה: ${err.message}`);
-              setPinMode(true);
+              if (devMode) setPinMode(true);
             },
             { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
           );
         } else {
           setLocError('הדפדפן לא תומך במיקום');
-          setPinMode(true);
+          if (devMode) setPinMode(true);
         }
       }}>
         <LocationIcon size={20} color="var(--text1)" />
