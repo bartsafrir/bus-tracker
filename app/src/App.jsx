@@ -62,8 +62,17 @@ async function getRoute(coords, profile = 'auto') {
   try {
     const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
     const data = await res.json();
-    if (!data.trip?.legs?.[0]?.shape) return null;
-    return decodePolyline(data.trip.legs[0].shape);
+    if (!data.trip?.legs?.length) return null;
+    // Combine all legs into one path
+    const allCoords = [];
+    for (const leg of data.trip.legs) {
+      if (leg.shape) {
+        const pts = decodePolyline(leg.shape);
+        // Skip first point of subsequent legs (same as last of previous)
+        allCoords.push(...(allCoords.length ? pts.slice(1) : pts));
+      }
+    }
+    return allCoords.length > 1 ? allCoords : null;
   } catch { return null; }
 }
 
