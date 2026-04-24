@@ -757,24 +757,27 @@ export default function App() {
 
       {/* ── LOCATION FAB ── */}
       <button className="location-fab" onClick={() => {
+        // If we have a location, just fly to it
         if (savedLoc) {
-          // Double-tap: re-acquire GPS. Single tap: fly to saved.
           setFlyToTrigger(t => t + 1);
+          // Also silently try to update GPS in background
+          navigator.geolocation?.getCurrentPosition(
+            pos => saveLocation(pos.coords.latitude, pos.coords.longitude),
+            () => {}, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+          return;
         }
-        // Always try GPS (even if we have a saved loc, update it)
+        // No saved location — try GPS, fallback to pin mode
         if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             pos => {
               saveLocation(pos.coords.latitude, pos.coords.longitude);
               setFlyToTrigger(t => t + 1);
             },
-            (err) => {
-              console.warn('Geolocation error:', err.code, err.message);
-              if (!savedLoc) setPinMode(true);
-            },
+            () => setPinMode(true),
             { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
           );
-        } else if (!savedLoc) {
+        } else {
           setPinMode(true);
         }
       }}>
@@ -784,7 +787,7 @@ export default function App() {
       {/* ── PIN BANNER ── */}
       {pinMode && (
         <div className="pin-banner">
-          <span>📍 לחץ על המפה</span>
+          <span>בחר מיקום על המפה</span>
           <button onClick={() => setPinMode(false)}>ביטול</button>
         </div>
       )}
