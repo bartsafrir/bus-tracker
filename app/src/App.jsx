@@ -28,6 +28,7 @@ async function apiFetch(endpoint, params = {}) {
 
 // Routing imported from utils
 import { getRoute } from './utils/polyline';
+import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
 // ─── Leaflet icons ───
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
@@ -463,8 +464,10 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Snap route to roads via OSRM match API (snaps to nearest road, no loops)
+        // Snap route to roads (cached across page refreshes)
         (async () => {
+          const cached = getCachedRoute(stopCoords, 'bus');
+          if (cached) { setRouteCoords(cached); return; }
           try {
             const CHUNK = 8;
             const allPts = [];
@@ -483,7 +486,7 @@ export default function App() {
               }
               if (i + CHUNK >= stopCoords.length) break;
             }
-            if (allPts.length > 1) setRouteCoords(allPts);
+            if (allPts.length > 1) { setRouteCoords(allPts); setCachedRoute(stopCoords, 'bus', allPts); }
           } catch { /* keep straight lines as fallback */ }
         })();
 
@@ -568,9 +571,12 @@ export default function App() {
   useEffect(() => {
     if (!savedLoc || !closestStop) { setWalkRoute(null); return; }
     let cancelled = false;
-    setWalkRoute(null); // reset while loading
-    getRoute([[savedLoc.lat, savedLoc.lon], [closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon]], 'foot')
-      .then(path => { if (!cancelled && path) setWalkRoute(path); })
+    const walkCoords = [[savedLoc.lat, savedLoc.lon], [closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon]];
+    const cached = getCachedRoute(walkCoords, 'foot');
+    if (cached) { setWalkRoute(cached); return; }
+    setWalkRoute(null);
+    getRoute(walkCoords, 'foot')
+      .then(path => { if (!cancelled && path) { setWalkRoute(path); setCachedRoute(walkCoords, 'foot', path); } })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [savedLoc, closestStop]);
