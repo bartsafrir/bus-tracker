@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouteStops, useTodayRouteId, useSiblings, api } from './hooks/useTransitData';
+import { useRouteStops, useTodayRouteId, useSiblings } from './hooks/useTransitData';
 import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
 import { distanceM } from './utils/geo';
