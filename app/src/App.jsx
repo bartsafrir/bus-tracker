@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet'
 import { FitBoundsOnChange, FlyToLocation, MapClickHandler } from './components/Map/MapControls';
 import L from 'leaflet';
 import { getOperatorColor } from './utils/operators';
-import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
+import { toIsraelTime } from './utils/time';
 import { distanceM } from './utils/geo';
 import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon } from './components/Icons';
 import SearchOverlay from './components/SearchOverlay';
@@ -115,7 +115,7 @@ function makeBusIcon(bearing, color, lineNum) {
 
 
 // Imported from utils/routes
-import { latestPerVehicle, extractCities as extractCitiesUtil } from './utils/routes';
+import { latestPerVehicle } from './utils/routes';
 import { today } from './utils/time';
 
 // ═══════════════════════════════════════════
@@ -732,13 +732,6 @@ export default function App() {
   }
 
   // ═══ HELPERS ═══
-  function getStatus(r) {
-    const now = israelNow().totalMinutes;
-    if (!r.firstTime || !r.lastTime || !r.rideCount) return { label: 'לא פעיל היום', cls: 'inactive' };
-    if (r.rideCount <= 3) return { label: `${r.rideCount} נסיעות בלבד`, cls: now >= r.firstTime.minutes && now <= r.lastTime.minutes + 60 ? 'sparse' : 'inactive' };
-    return now >= r.firstTime.minutes - 10 && now <= r.lastTime.minutes + 60 ? { label: 'פעיל עכשיו', cls: 'active' } : { label: 'לא פעיל כרגע', cls: 'inactive' };
-  }
-
   function extractCities(name) {
     // "כרמלית-תל אביב יפו<->ת. מרכזית רחובות/רציפים-רחובות-1#"
     const cleaned = name.replace(/-\d+[#0-9א-ת]*$/, '');
@@ -835,7 +828,6 @@ export default function App() {
     walkMin = Math.max(1, Math.round((walkDist * 1.2) / 83));
   }
 
-  const nowMin = israelNow().totalMinutes;
 
   // ═══════════ RENDER ═══════════
   return (
