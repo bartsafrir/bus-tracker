@@ -33,6 +33,7 @@ import { getRoute } from './utils/polyline';
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
 const stopIconSm = L.divIcon({ className: '', html: '<div class="stop-dot"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
 const closestStopIcon = L.divIcon({ className: '', html: '<div class="stop-dot closest"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
+const selectedStopIcon = L.divIcon({ className: '', html: '<div class="stop-dot selected"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
 
 function makeBusIcon(bearing, color, lineNum) {
   const r = bearing ?? 0;
@@ -831,7 +832,7 @@ export default function App() {
 
         {stops.map(s => (
           <Marker key={s.id} position={[s.gtfs_stop__lat, s.gtfs_stop__lon]}
-            icon={selectedStop?.id === s.id || closestStop?.id === s.id ? closestStopIcon : stopIconSm}
+            icon={selectedStop?.id === s.id ? selectedStopIcon : closestStop?.id === s.id ? closestStopIcon : stopIconSm}
             eventHandlers={{ click: () => openSchedule(s) }} />
         ))}
 
