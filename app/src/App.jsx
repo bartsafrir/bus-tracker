@@ -5,8 +5,11 @@ import L from 'leaflet';
 import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
 import { distanceM } from './utils/geo';
-import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon, CloseIcon, WalkIcon, SwapIcon } from './components/Icons';
+import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon } from './components/Icons';
 import SearchOverlay from './components/SearchOverlay';
+import HomeSheet from './components/HomeSheet';
+import TrackingSheet from './components/TrackingSheet';
+import ScheduleSheet from './components/ScheduleSheet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 
@@ -1040,330 +1043,52 @@ export default function App() {
         }}><div className="sheet-handle" /></div>
         <div className="sheet-content">
 
-          {/* HOME */}
           {view === 'home' && (
-            <div>
-              {/* Smart suggestions */}
-              {suggestions.length > 0 && (
-                <>
-                  <div className="section-hdr">✦ מוצע עבורך</div>
-                  {suggestions.map(s => {
-                    const c = getOperatorColor(s.agencyName);
-                    const live = suggestionsLive[s.lineRef];
-                    return (
-                      <div key={s.lineRef} className="row" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
-                        <div className="badge-line" style={{ background: c.bg }}>{s.lineName}</div>
-                        <div className="row-info">
-                          <div className="row-name">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
-                          <div className="row-detail">
-                            {s.agencyName}
-                            {live?.stopName && ` · ${live.stopName}`}
-                          </div>
-                        </div>
-                        {live?.liveCount > 0 && (
-                          <div className="row-right">
-                            {live.eta != null ? (
-                              <>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><span className="live-badge">LIVE</span></div>
-                                <div className="row-eta">{live.eta}</div>
-                                <div className="row-unit">דק'</div>
-                              </>
-                            ) : (
-                              <span className="live-badge">LIVE</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-
-              {/* Nearby live */}
-              {nearbyBuses.length > 0 && (
-                <>
-                  <div className="section-hdr">קווים חיים סביבך</div>
-                  {nearbyBuses.map(b => {
-                    const c = getOperatorColor(b.agency);
-                    const distText = b.dist < 1000 ? `${Math.round(b.dist)} מ'` : `${(b.dist/1000).toFixed(1)} ק"מ`;
-                    return (
-                      <div key={b.siri_ride__vehicle_ref} className="row"
-                        onClick={() => startTracking(b.name, [b.siri_route__line_ref], b.agency, b.from, b.to)}>
-                        <div className="badge-line" style={{ background: c.bg }}>{b.name}</div>
-                        <div className="row-info">
-                          <div className="row-name">{b.from ? fmtDir(b.from, b.to) : b.name}</div>
-                          <div className="row-detail">{b.agency} · {distText}</div>
-                        </div>
-                        {b.etaMin != null && (
-                          <div className="row-right">
-                            <div className="row-eta">{b.etaMin}</div>
-                            <div className="row-unit">דק'</div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-
-              {/* Empty state */}
-              {!suggestions.length && !recentLines.length && !nearbyBuses.length && (
-                <div className="row" onClick={goSearch} style={{ justifyContent: 'center', color: 'var(--text2)', fontWeight: 500 }}>
-                  <SearchIcon size={16} color="var(--text2)" />
-                  <span style={{ marginRight: 6 }}>חפש קו כדי להתחיל</span>
-                </div>
-              )}
-
-              {/* Recent lines */}
-              {recentLines.length > 0 && (
-                <>
-                  <div className="section-hdr">{suggestions.length ? 'אחרונים' : 'קווים אחרונים'}</div>
-                  <div className="chip-row">
-                    {recentLines.slice(0, 6).map(r => {
-                      const c = getOperatorColor(r.agencyName);
-                      return (
-                        <button key={r.lineRef} className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                          onClick={() => startTracking(r.lineName, [r.lineRef], r.agencyName, r.from, r.to)}>
-                          <span style={{ background: c.bg, color: 'white', padding: '1px 6px', borderRadius: 4, fontSize: 12, fontWeight: 700 }}>{r.lineName}</span>
-                          <span style={{ fontSize: 12 }}>{r.from || r.agencyName}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
+            <HomeSheet
+              suggestions={suggestions}
+              suggestionsLive={suggestionsLive}
+              nearbyBuses={nearbyBuses}
+              recentLines={recentLines}
+              fmtDir={fmtDir}
+              onTrackLine={startTracking}
+              onSearch={goSearch}
+            />
           )}
 
-          {/* TRACKING */}
           {view === 'tracking' && (
-            <div>
-              {/* Direction bar — tap swap to switch, long-press for full picker */}
-              {tracked?.cities && (
-                <div className="dir-bar">
-                  <div className="dir-bar-text" onClick={() => tracked?.siblings?.length > 1 && setShowDirPicker(!showDirPicker)}>
-                    {fmtDir(tracked.from, tracked.to)}
-                    {tracked?.siblings?.length > 1 && <span className="dir-bar-more"> ▾</span>}
-                  </div>
-                  {tracked?.siblings?.length > 1 && (
-                    <button className="dir-swap-btn" onClick={() => {
-                      const current = tracked.siblings.find(s => s.lineRef === tracked.lineRefs[0]);
-                      if (!current) return;
-                      // Find mirror: same alternative, different direction
-                      let mirror = tracked.siblings.find(s =>
-                        s.lineRef !== current.lineRef && s.alternative === current.alternative && s.direction !== current.direction
-                      );
-                      // Fallback: any sibling with same alternative
-                      if (!mirror) mirror = tracked.siblings.find(s =>
-                        s.lineRef !== current.lineRef && s.alternative === current.alternative
-                      );
-                      // Fallback: any other sibling that's not the current one
-                      if (!mirror) mirror = tracked.siblings.find(s => s.lineRef !== current.lineRef);
-                      if (mirror) {
-                        startTracking(tracked.lineName, [mirror.lineRef], tracked.agencyName, mirror.from, mirror.to, tracked.siblings);
-                      }
-                    }}>
-                      <SwapIcon size={16} color="var(--text1)" />
-                    </button>
-                  )}
-                </div>
-              )}
-              {/* Full direction picker */}
-              {showDirPicker && tracked?.siblings && (
-                <div className="dir-picker">
-                  {tracked.siblings.map(s => (
-                    <div key={s.lineRef}
-                      className={`dir-picker-item ${s.lineRef === tracked.lineRefs[0] ? 'active' : ''}`}
-                      onClick={() => {
-                        setShowDirPicker(false);
-                        if (s.lineRef !== tracked.lineRefs[0]) {
-                          startTracking(tracked.lineName, [s.lineRef], tracked.agencyName, s.from, s.to, tracked.siblings);
-                        }
-                      }}>
-                      <span className="dir-picker-label">{fmtDir(s.from, s.to)}</span>
-                      {s.lineRef === tracked.lineRefs[0] && <span className="dir-picker-check">✓</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {closestStop && (
-                <div className="stop-card">
-                  <div>
-                    <div className="stop-name">{closestStop.gtfs_stop__name || 'תחנה'}{closestStop.gtfs_stop__city ? `, ${closestStop.gtfs_stop__city}` : ''}</div>
-                    <div className="stop-sub">{closestStop.gtfs_stop__code ? `תחנה ${closestStop.gtfs_stop__code} · ` : ''}<WalkIcon size={13} color="var(--walk-text)" /> {walkMin != null ? `${walkMin} דק' הליכה` : 'התחנה הקרובה'}{walkDist != null ? ` · ${walkDist < 1000 ? Math.round(walkDist) + ' מ\'' : (walkDist/1000).toFixed(1) + ' ק"מ'}` : ''}</div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {liveEta != null ? (
-                      <div className="eta-block">
-                        <div style={{ marginBottom: 4 }}><span className="live-badge">LIVE</span></div>
-                        <div className="eta-num">~{liveEta}</div>
-                        <div className="eta-label">דקות{liveStopsAway ? ` · ${liveStopsAway} תחנות` : ''}</div>
-                      </div>
-                    ) : vehicles.length > 0 ? (
-                      <div className="eta-block">
-                        <span className="live-badge">LIVE</span>
-                        <div className="eta-label" style={{ marginTop: 4 }}>{vehicles.length} במעקב</div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-              {closestStop && (
-                <div style={{ padding: '14px 24px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-                  onClick={() => openSchedule(closestStop)}>
-                  <span style={{ fontSize: 13, color: 'var(--blue)', fontWeight: 600 }}>צפה בלוח זמנים מלא →</span>
-                </div>
-              )}
-              {!closestStop && !vehicles.length && (
-                <div className="empty-msg">אין מעקב חי כרגע</div>
-              )}
-            </div>
+            <TrackingSheet
+              tracked={tracked}
+              closestStop={closestStop}
+              vehicles={vehicles}
+              liveEta={liveEta}
+              liveStopsAway={liveStopsAway}
+              walkMin={walkMin}
+              walkDist={walkDist}
+              showDirPicker={showDirPicker}
+              fmtDir={fmtDir}
+              onToggleDirPicker={() => tracked?.siblings?.length > 1 && setShowDirPicker(!showDirPicker)}
+              onSwapDirection={() => {
+                const current = tracked?.siblings?.find(s => s.lineRef === tracked.lineRefs[0]);
+                if (!current) return;
+                let mirror = tracked.siblings.find(s => s.lineRef !== current.lineRef && s.alternative === current.alternative && s.direction !== current.direction);
+                if (!mirror) mirror = tracked.siblings.find(s => s.lineRef !== current.lineRef && s.alternative === current.alternative);
+                if (!mirror) mirror = tracked.siblings.find(s => s.lineRef !== current.lineRef);
+                if (mirror) startTracking(tracked.lineName, [mirror.lineRef], tracked.agencyName, mirror.from, mirror.to, tracked.siblings);
+              }}
+              onPickDirection={(s) => { setShowDirPicker(false); if (s.lineRef !== tracked?.lineRefs?.[0]) startTracking(tracked.lineName, [s.lineRef], tracked.agencyName, s.from, s.to, tracked.siblings); }}
+              onOpenSchedule={openSchedule}
+            />
           )}
 
-          {/* SCHEDULE — minutes-first */}
           {view === 'schedule' && selectedStop && (
-            <div>
-              {/* Header */}
-              <div className="sched-head">
-                <div>
-                  <div className="sched-title">
-                    <span className="sched-line-badge" style={{ background: opColor }}>{tracked?.lineName}</span>
-                    {selectedStop.gtfs_stop__name || 'תחנה'}
-                  </div>
-                  <div className="sched-sub">{selectedStop.gtfs_stop__code ? `תחנה ${selectedStop.gtfs_stop__code} · ` : ''}{selectedStop.gtfs_stop__city ? `${selectedStop.gtfs_stop__city} · ` : ''}{tracked?.agencyName}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <button className="sched-close" onClick={() => { setSelectedStop(null); setView('tracking'); }}><CloseIcon size={16} /></button>
-                </div>
-              </div>
-
-              {!schedule && <div className="loading"><div className="spinner" /><span>טוען לוח זמנים...</span></div>}
-
-              {schedule && (() => {
-                // Split into past, live, future
-                const past = [];
-                const upcoming = [];
-                let foundNext = false;
-
-                // Detect if arrival is "tomorrow" in Israel time
-                const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-
-                for (const a of schedule) {
-                  // Use real timestamp diff, not minutes-of-day (handles midnight correctly)
-                  const isPast = a.passed || (!a.live && a.diffMin < -2);
-                  if (isPast) { past.push(a); continue; }
-                  const mins = a.live && a.liveEta != null ? a.liveEta : Math.max(0, a.diffMin);
-                  const arrDateIL = new Date(a.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-                  const isTomorrow = arrDateIL > todayIL;
-                  const isLive = !!a.live;
-                  const cantCatch = walkMin != null && mins < walkMin;
-                  const tooClose = cantCatch;
-                  const isNext = !tooClose && !foundNext;
-                  if (isNext) foundNext = true;
-
-                  upcoming.push({ ...a, mins, isNext, isLive, tooClose, isTomorrow });
-                }
-
-                return (
-                  <>
-                    {/* Past collapsed */}
-                    {past.length > 0 && (
-                      <div className="sc-past-bar">
-                        <span>{past.length} נסיעות עברו</span>
-                        <div className="sc-past-line" />
-                      </div>
-                    )}
-
-                    {/* No more rides — show when next ride is */}
-                    {upcoming.length === 0 && past.length > 0 && (() => {
-                      // Find the first future ride from the full schedule (including next day)
-                      const nextRide = schedule.find(a => a.diffMin > 0);
-                      const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-                      let nextLabel = '';
-                      if (nextRide) {
-                        const rideDate = new Date(nextRide.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-                        const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-                        const rideDay = new Date(nextRide.arrivalMs).toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem', weekday: 'long' });
-                        if (rideDate === todayIL) nextLabel = `הנסיעה הבאה היום ב-${nextRide.str}`;
-                        else {
-                          const tomorrow = new Date(new Date(todayIL).getTime() + 86400000).toLocaleDateString('en-CA');
-                          nextLabel = rideDate === tomorrow ? `מחר ב-${nextRide.str}` : `יום ${rideDay} ב-${nextRide.str}`;
-                        }
-                      }
-                      return (
-                        <div style={{ padding: '20px 24px', textAlign: 'center' }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 }}>אין נסיעות פעילות כרגע</div>
-                          <div style={{ fontSize: 13, color: 'var(--text2)' }}>
-                            {nextLabel || 'לוח הזמנים עדיין לא פורסם — בדוק שוב מאוחר יותר'}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Upcoming */}
-                    {upcoming.map((a, i) => {
-                      // The next LIVE bus = highlighted card
-                      if (a.isNext && a.isLive) {
-                        return (
-                          <div key={i} className="sc-hero">
-                            <div className="sc-hero-inner">
-                              <div className="sc-mins-col">
-                                <div className="sc-mins-big hero">{a.mins}</div>
-                                <div className="sc-mins-label hero">דק'</div>
-                              </div>
-                              <div className="sc-hero-info">
-                                <span className="live-badge">LIVE</span>
-                                {a.stopsAway && <span className="sc-stops">{a.stopsAway} תחנות</span>}
-                              </div>
-                              <div className="sc-clock-col">
-                                <div className="sc-clock-sched">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Other LIVE rows
-                      if (a.isLive) {
-                        return (
-                          <div key={i} className={`sc-row ${a.tooClose ? 'faded' : ''}`}>
-                            <div className="sc-mins-col">
-                              <div className="sc-mins-big live">{a.mins}</div>
-                              <div className="sc-mins-label live">דק'</div>
-                            </div>
-                            <div className="sc-row-mid">
-                              <span className="live-badge">LIVE</span>
-                              {a.stopsAway && <span className="sc-stops">{a.stopsAway} תחנות</span>}
-                              {a.tooClose && <span className="sc-miss">לא תספיק</span>}
-                            </div>
-                            <div className="sc-clock-col">
-                              <div className="sc-clock-sched">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</div>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Scheduled rows
-                      const far = a.mins > 60;
-                      return (
-                        <div key={i} className={`sc-row ${far ? 'faded' : ''} ${a.tooClose ? 'faded' : ''}`}>
-                          <div className="sc-mins-col">
-                            <div className={`sc-mins-big ${a.isNext ? 'next' : ''}`}>{a.mins}</div>
-                            <div className="sc-mins-label">דק'</div>
-                          </div>
-                          <div className="sc-row-mid">
-                            {a.tooClose && <span className="sc-miss">לא תספיק</span>}
-                          </div>
-                          <div className="sc-clock-col">
-                            <span className="sc-clock-time">{a.str}{a.isTomorrow && <span className="sc-tomorrow">מחר</span>}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                );
-              })()}
-            </div>
+            <ScheduleSheet
+              selectedStop={selectedStop}
+              tracked={tracked}
+              schedule={schedule}
+              opColor={opColor}
+              walkMin={walkMin}
+              onClose={() => { setSelectedStop(null); setView('tracking'); }}
+            />
           )}
 
         </div>
