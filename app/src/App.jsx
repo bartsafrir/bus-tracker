@@ -449,33 +449,9 @@ export default function App() {
   const vehicleTimer = useRef(null);
   const searchInputRef = useRef(null);
 
-  // ─── React Query: cached route data ───
+  // React Query hooks available but not blocking — used for pre-caching only
   const trackingLineRef = tracked?.lineRefs?.[0] || null;
   const todayDate = useMemo(() => today(), []);
-  const { data: todayRouteId } = useTodayRouteId(trackingLineRef, todayDate);
-  const { data: routeStopsData } = useRouteStops(todayRouteId);
-  const { data: siblingsData } = useSiblings(tracked?.lineName, tracked?.agencyName, todayDate);
-
-  // Sync React Query data → local state (for backward compat with existing rendering)
-  useEffect(() => {
-    if (!routeStopsData) return;
-    setStops(routeStopsData.stops);
-    setRouteCoords(routeStopsData.stops.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]));
-    setScheduleData({ stopOffsets: routeStopsData.offsets, todayGtfsRouteId: todayRouteId, referenceRideStart: routeStopsData.refStart });
-    setFitTrigger(t => t + 1);
-    // Get actual driving route
-    getRoute(routeStopsData.stops.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]), 'bus').then(path => { if (path) setRouteCoords(path); });
-  }, [routeStopsData, todayRouteId]);
-
-  // Sync siblings
-  useEffect(() => {
-    if (!siblingsData?.length || !tracked) return;
-    const sibs = siblingsData.map(r => {
-      const c = extractCities(r.routeLongName);
-      return { lineRef: r.lineRef, from: c.from, to: c.to, direction: r.direction, alternative: r.alternative };
-    });
-    if (sibs.length > 1) setTracked(prev => prev ? { ...prev, siblings: sibs } : prev);
-  }, [siblingsData]);
 
   // ─── Derived ───
   const fitCoords = useMemo(() => {
@@ -554,26 +530,72 @@ export default function App() {
   }
 
   // ═══ TRACK LINE ═══
-  // Route stops, path, and siblings are now handled by React Query hooks above.
-  // startTracking just sets the state that triggers those hooks.
   async function startTracking(lineName, lineRefs, agencyName, dirFrom, dirTo, siblings) {
     setView('tracking');
     setShowDirPicker(false);
+    setLoading(true);
+    setLoadingMsg('טוען מסלול...');
     const color = getOperatorColor(agencyName);
     setOpColor(color.bg);
     setTracked({ lineName, lineRefs, agencyName, from: dirFrom || '', to: dirTo || '', siblings: siblings || null });
     logUsage({ lineName, lineRef: lineRefs[0], agencyName, from: dirFrom || '', to: dirTo || '' });
     setVehicles([]);
-    setSelectedStop(null);
-    setSchedule(null);
+    setStops([]);
+    setRouteCoords([]);
     setWalkRoute(null);
+    setClosestStop(null);
+    setSelectedStop(null);
+    setScheduleData(null);
+    setSchedule(null);
     clearInterval(vehicleTimer.current);
 
-    // Only manual work: fetch vehicles (live, not cached)
     try {
+      // Get today's route ID
+      const todayRoutes = await apiFetch('/gtfs_routes/list', { line_refs: lineRefs[0], date: today(), limit: 1, order_by: 'date desc' });
+      const routeId = todayRoutes[0]?.id || null;
+
+      // Get one ride for stops
+      const rides = await apiFetch('/gtfs_rides/list', routeId ? { gtfs_route_id: routeId, limit: 1 } : { gtfs_route__line_refs: lineRefs[0], limit: 1 });
+      if (rides.length) {
+        const rideStops = await apiFetch('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
+        const sorted = rideStops.filter(s => s.gtfs_stop__lat && s.gtfs_stop__lon).sort((a, b) => a.stop_sequence - b.stop_sequence);
+        setStops(sorted);
+        const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
+        setRouteCoords(stopCoords);
+        setFitTrigger(t => t + 1);
+        getRoute(stopCoords, 'bus').then(path => { if (path) setRouteCoords(path); });
+
+        const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
+        const offsets = new Map();
+        for (const s of sorted) {
+          if (s.arrival_time && s.gtfs_stop_id && refStart) {
+            offsets.set(s.gtfs_stop_id, { offsetMs: new Date(s.arrival_time).getTime() - refStart, shapeDist: s.shape_dist_traveled });
+          }
+        }
+        setScheduleData({ stopOffsets: offsets, todayGtfsRouteId: routeId, referenceRideStart: refStart });
+      }
+
+      // Fetch siblings
+      if (!siblings) {
+        try {
+          const allRoutes = await apiFetch('/gtfs_routes/list', { route_short_name: lineName, date: today(), limit: 200, order_by: 'date desc' });
+          const td = today();
+          const seen = new Set();
+          const sibs = allRoutes
+            .filter(r => r.date === td && r.agency_name === agencyName && !seen.has(r.line_ref) && (seen.add(r.line_ref), true))
+            .map(r => {
+              const c = extractCities(r.route_long_name);
+              return { lineRef: r.line_ref, from: c.from, to: c.to, direction: r.route_direction, alternative: r.route_alternative };
+            });
+          if (sibs.length > 1) setTracked(prev => prev ? { ...prev, siblings: sibs } : prev);
+        } catch { /* non-critical */ }
+      }
+
+      // Fetch vehicles
       await refreshVehicles(lineRefs);
       vehicleTimer.current = setInterval(() => refreshVehicles(lineRefs), 30000);
     } catch (e) { console.error('Track:', e); }
+    setLoading(false);
   }
 
   // Recalculate closest stop by walking distance (OSRM table API)
