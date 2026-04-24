@@ -37,16 +37,33 @@ function today() {
 }
 
 // OSRM routing — returns [[lat,lon],...] or null
-async function getRoute(coords, profile = 'driving') {
-  // coords: [[lat,lon],[lat,lon],...] — OSRM wants lon,lat
+// Decode Valhalla encoded polyline (precision 6)
+function decodePolyline(str) {
+  const coords = []; let lat = 0, lon = 0, i = 0;
+  while (i < str.length) {
+    let b, shift = 0, result = 0;
+    do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lon += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lat / 1e6, lon / 1e6]);
+  }
+  return coords;
+}
+
+// Routing via Valhalla (real pedestrian + bus profiles)
+async function getRoute(coords, profile = 'auto') {
   if (coords.length < 2) return null;
-  // Batch max 100 waypoints for OSRM
-  const pts = coords.slice(0, 100).map(c => `${c[1]},${c[0]}`).join(';');
+  // Valhalla costing: pedestrian, bus, auto
+  const costing = profile === 'foot' ? 'pedestrian' : profile === 'bus' ? 'bus' : 'auto';
+  const locations = coords.slice(0, 50).map(c => ({ lat: c[0], lon: c[1] }));
+  const body = JSON.stringify({ locations, costing, directions_options: { units: 'km' } });
   try {
-    const res = await fetch(`https://router.project-osrm.org/route/v1/${profile}/${pts}?overview=full&geometries=geojson`);
+    const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
     const data = await res.json();
-    if (data.code !== 'Ok' || !data.routes?.[0]) return null;
-    return data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // flip back to [lat,lon]
+    if (!data.trip?.legs?.[0]?.shape) return null;
+    return decodePolyline(data.trip.legs[0].shape);
   } catch { return null; }
 }
 
@@ -445,7 +462,7 @@ export default function App() {
         setFitTrigger(t => t + 1);
 
         // Get actual driving route (async, non-blocking)
-        getRoute(stopCoords, 'driving').then(path => { if (path) setRouteCoords(path); });
+        getRoute(stopCoords, 'bus').then(path => { if (path) setRouteCoords(path); });
 
         // Offsets
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
@@ -505,21 +522,22 @@ export default function App() {
       const candidates = byDist.slice(0, 15);
       if (candidates.length < 2) return;
 
-      const pts = [
-        `${savedLoc.lon},${savedLoc.lat}`,
-        ...candidates.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)
-      ].join(';');
+      // Valhalla matrix API for pedestrian walking times
+      const sources = [{ lat: savedLoc.lat, lon: savedLoc.lon }];
+      const targets = candidates.map(r => ({ lat: r.s.gtfs_stop__lat, lon: r.s.gtfs_stop__lon }));
+      const body = JSON.stringify({ sources, targets, costing: 'pedestrian' });
 
       try {
-        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=duration`);
+        const res = await fetch(`https://valhalla1.openstreetmap.de/sources_to_targets?json=${encodeURIComponent(body)}`);
         if (!res.ok) return;
         const data = await res.json();
-        if (cancelled || data.code !== 'Ok' || !data.durations?.[0]) return;
+        if (cancelled || !data.sources_to_targets?.[0]) return;
 
-        const durations = data.durations[0];
+        const times = data.sources_to_targets[0]; // [{time, distance}, ...]
         let bestIdx = -1, bestTime = Infinity;
-        for (let i = 1; i < durations.length; i++) {
-          if (durations[i] != null && durations[i] < bestTime) { bestTime = durations[i]; bestIdx = i - 1; }
+        for (let i = 0; i < times.length; i++) {
+          const t = times[i].time;
+          if (t != null && t > 0 && t < bestTime) { bestTime = t; bestIdx = i; }
         }
         if (bestIdx >= 0) {
           setClosestStop(candidates[bestIdx].s);
@@ -803,7 +821,7 @@ export default function App() {
 
         {stops.map(s => (
           <Marker key={s.id} position={[s.gtfs_stop__lat, s.gtfs_stop__lon]}
-            icon={closestStop?.id === s.id ? closestStopIcon : stopIconSm}
+            icon={selectedStop?.id === s.id || closestStop?.id === s.id ? closestStopIcon : stopIconSm}
             eventHandlers={{ click: () => openSchedule(s) }} />
         ))}
 
@@ -1315,6 +1333,16 @@ export default function App() {
                       <div className="sc-past-bar">
                         <span>{past.length} נסיעות עברו</span>
                         <div className="sc-past-line" />
+                      </div>
+                    )}
+
+                    {/* No more rides today */}
+                    {upcoming.length === 0 && past.length > 0 && (
+                      <div style={{ padding: '20px 24px', textAlign: 'center' }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 }}>אין נסיעות נוספות היום</div>
+                        <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+                          {schedule[0] ? `מחר הנסיעה הראשונה ב-${schedule[0].str}` : 'בדוק שוב מחר'}
+                        </div>
                       </div>
                     )}
 
