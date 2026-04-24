@@ -1,8 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouteStops, useTodayRouteId, useSiblings } from './hooks/useTransitData';
 import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
 import { distanceM } from './utils/geo';
@@ -449,9 +447,6 @@ export default function App() {
   const vehicleTimer = useRef(null);
   const searchInputRef = useRef(null);
 
-  // React Query hooks available but not blocking — used for pre-caching only
-  const trackingLineRef = tracked?.lineRefs?.[0] || null;
-  const todayDate = useMemo(() => today(), []);
 
   // ─── Derived ───
   const fitCoords = useMemo(() => {
