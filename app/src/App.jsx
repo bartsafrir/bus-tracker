@@ -463,15 +463,27 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Snap route to roads via OSRM (no waypoint limit, continue_straight avoids loops)
+        // Snap route to roads via OSRM match API (snaps to nearest road, no loops)
         (async () => {
           try {
-            const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
-            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true`);
-            const data = await res.json();
-            if (data.routes?.[0]?.geometry?.coordinates) {
-              setRouteCoords(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+            const CHUNK = 8;
+            const allPts = [];
+            for (let i = 0; i < stopCoords.length; i += CHUNK - 1) {
+              const chunk = stopCoords.slice(i, i + CHUNK);
+              const pts = chunk.map(c => `${c[1]},${c[0]}`).join(';');
+              const radii = chunk.map(() => '25').join(';');
+              const ts = chunk.map((_, j) => (i + j) * 60).join(';');
+              const res = await fetch(`https://router.project-osrm.org/match/v1/driving/${pts}?overview=full&geometries=geojson&radiuses=${radii}&timestamps=${ts}`);
+              const data = await res.json();
+              if (data.matchings) {
+                for (const m of data.matchings) {
+                  const coords = m.geometry.coordinates.map(c => [c[1], c[0]]);
+                  allPts.push(...(allPts.length ? coords.slice(1) : coords));
+                }
+              }
+              if (i + CHUNK >= stopCoords.length) break;
             }
+            if (allPts.length > 1) setRouteCoords(allPts);
           } catch { /* keep straight lines as fallback */ }
         })();
 
