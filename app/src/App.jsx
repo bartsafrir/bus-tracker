@@ -6,6 +6,7 @@ import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
 import { distanceM } from './utils/geo';
 import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon, CloseIcon, WalkIcon, SwapIcon } from './components/Icons';
+import SearchOverlay from './components/SearchOverlay';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 
@@ -386,12 +387,6 @@ export default function App() {
   const [flyToTrigger, setFlyToTrigger] = useState(0);
   const [fitTrigger, setFitTrigger] = useState(0);
 
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchStep, setSearchStep] = useState('input'); // input | operators | directions
-  const [searchOperators, setSearchOperators] = useState(null);
-  const [searchDirections, setSearchDirections] = useState(null);
-  const [searchLineName, setSearchLineName] = useState('');
 
   // Tracking state
   const [tracked, setTracked] = useState(null); // { lineName, lineRefs, agencyName, cities, siblings }
@@ -408,8 +403,6 @@ export default function App() {
   const [opColor, setOpColor] = useState('#00A651');
 
   const vehicleTimer = useRef(null);
-  const searchInputRef = useRef(null);
-
 
   // ─── Derived ───
   const fitCoords = useMemo(() => {
@@ -418,74 +411,6 @@ export default function App() {
     if (savedLoc) c.push([savedLoc.lat, savedLoc.lon]);
     return c;
   }, [routeCoords, vehicles, savedLoc]);
-
-  // ═══ SEARCH ═══
-  // Auto-search with debounce
-  const searchTimer = useRef(null);
-  useEffect(() => {
-    if (view !== 'search' || !searchQuery.trim() || searchQuery.trim().length < 1) return;
-    clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => doSearch(searchQuery), 400);
-    return () => clearTimeout(searchTimer.current);
-  }, [searchQuery, view]);
-
-  async function doSearch(term) {
-    const t = (term || searchQuery).trim();
-    if (!t) return;
-    setSearchLineName(t);
-    setLoading(true);
-    setLoadingMsg('מחפש...');
-    setSearchStep('input');
-
-    try {
-      const routes = await apiFetch('/gtfs_routes/list', { route_short_name: t, date: today(), limit: 200, order_by: 'date desc' });
-      const todayDate = today();
-      const seen = new Set();
-      let unique = routes.filter(r => { if (r.date === todayDate && !seen.has(r.line_ref)) { seen.add(r.line_ref); return true; } return false; });
-      if (!unique.length) { seen.clear(); unique = routes.filter(r => { if (!seen.has(r.line_ref)) { seen.add(r.line_ref); return true; } return false; }); }
-
-      if (!unique.length) { setSearchOperators(new Map()); setSearchStep('operators'); setLoading(false); return; }
-
-      // Enrich with hours
-      const enriched = await Promise.all(unique.map(async r => {
-        try {
-          const [first, last] = await Promise.all([
-            apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time asc' }),
-            apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time desc' }),
-          ]);
-          const allR = await apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 200 });
-          return {
-            ...r,
-            firstTime: first[0]?.start_time ? toIsraelTime(new Date(first[0].start_time)) : null,
-            lastTime: last[0]?.start_time ? toIsraelTime(new Date(last[0].start_time)) : null,
-            rideCount: allR.filter(rd => rd.start_time).length,
-          };
-        } catch { return { ...r, firstTime: null, lastTime: null, rideCount: 0 }; }
-      }));
-
-      // Group by operator
-      const byOp = new Map();
-      for (const r of enriched) {
-        if (!byOp.has(r.agency_name)) byOp.set(r.agency_name, []);
-        byOp.get(r.agency_name).push(r);
-      }
-
-      if (byOp.size === 1) {
-        const [opName, opRoutes] = [...byOp.entries()][0];
-        if (opRoutes.length === 1) {
-          const c = extractCities(opRoutes[0].route_long_name);
-          startTracking(t, [opRoutes[0].line_ref], opName, c.from, c.to);
-        } else {
-          setSearchDirections({ opName, routes: opRoutes });
-          setSearchStep('directions');
-        }
-      } else {
-        setSearchOperators(byOp);
-        setSearchStep('operators');
-      }
-    } catch (e) { console.error(e); }
-    setLoading(false);
-  }
 
   // ═══ TRACK LINE ═══
   async function startTracking(lineName, lineRefs, agencyName, dirFrom, dirTo, siblings) {
@@ -801,10 +726,6 @@ export default function App() {
 
   function goSearch() {
     setView('search');
-    setSearchStep('input');
-    setSearchOperators(null);
-    setSearchDirections(null);
-    setTimeout(() => searchInputRef.current?.focus(), 100);
   }
 
   // ═══ HELPERS ═══
@@ -1098,128 +1019,14 @@ export default function App() {
         </div>
       )}
 
-      {/* ── SEARCH OVERLAY (full screen, above everything) ── */}
+      {/* ── SEARCH OVERLAY ── */}
       {view === 'search' && (
-        <div className="search-overlay">
-          <div className="search-bar">
-            <button className="search-close" onClick={goHome}><CloseIcon size={16} /></button>
-            <input ref={searchInputRef} className="search-field" placeholder="הקלד מספר קו..." inputMode="numeric"
-              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && doSearch()} autoFocus />
-            {searchQuery && (
-              <button className="search-clear" onClick={() => { setSearchQuery(''); setSearchStep('input'); setSearchOperators(null); setSearchDirections(null); searchInputRef.current?.focus(); }}>
-                <CloseIcon size={14} />
-              </button>
-            )}
-          </div>
-
-          {!loading && searchStep === 'input' && !searchQuery.trim() && (suggestions.length > 0 || recentLines.length > 0) && (
-            <>
-              {suggestions.length > 0 && (
-                <>
-                  <div className="section-hdr">מוצע עבורך</div>
-                  {suggestions.slice(0, 4).map(s => {
-                    const color = getOperatorColor(s.agencyName);
-                    return (
-                      <div key={s.lineRef} className="picker-item" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
-                        <div className="badge-line" style={{ background: color.bg }}>{s.lineName}</div>
-                        <div className="picker-info">
-                          <div className="picker-title">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
-                          <div className="picker-sub">{s.agencyName}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-              {recentLines.length > 0 && (
-                <>
-                  <div className="section-hdr">אחרונים</div>
-                  {recentLines.slice(0, 4).map(r => {
-                    const color = getOperatorColor(r.agencyName);
-                    return (
-                      <div key={r.lineRef} className="picker-item" onClick={() => startTracking(r.lineName, [r.lineRef], r.agencyName, r.from, r.to)}>
-                        <div className="badge-line" style={{ background: color.bg }}>{r.lineName}</div>
-                        <div className="picker-info">
-                          <div className="picker-title">{r.from ? fmtDir(r.from, r.to) : r.agencyName}</div>
-                          <div className="picker-sub">{r.agencyName}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>
-              )}
-            </>
-          )}
-
-          {!loading && searchStep === 'operators' && searchOperators && (
-            <>
-              <div className="section-hdr">תוצאות לקו {searchLineName}</div>
-              {searchOperators.size === 0 && <div className="empty-msg">לא נמצא קו {searchLineName}</div>}
-              {[...searchOperators.entries()]
-                .sort((a, b) => { const aA = a[1].some(r => getStatus(r).cls === 'active'); const bA = b[1].some(r => getStatus(r).cls === 'active'); return aA === bA ? 0 : aA ? -1 : 1; })
-                .map(([opName, routes]) => {
-                  const cities = extractCities(routes[0].route_long_name);
-                  const best = routes.find(r => getStatus(r).cls === 'active') || routes[0];
-                  const st = getStatus(best);
-                  const color = getOperatorColor(opName);
-                  const hrs = best.firstTime && best.lastTime ? `${best.firstTime.str}-${best.lastTime.str}` : '';
-                  return (
-                    <div key={opName} className="picker-item" onClick={() => {
-                      if (routes.length === 1) { const c = extractCities(routes[0].route_long_name); startTracking(searchLineName, [routes[0].line_ref], opName, c.from, c.to); }
-                      else { setSearchDirections({ opName, routes }); setSearchStep('directions'); }
-                    }}>
-                      <div className="badge-line" style={{ background: color.bg, fontSize: 17, padding: '6px 16px' }}>{searchLineName}</div>
-                      <div className="picker-info">
-                        <div className="picker-title">{opName}</div>
-                        <div className="picker-sub">{cities.from} ↔ {cities.to}{hrs && <> · <span className="picker-hours">{hrs}</span></>}</div>
-                        <span className={`status-badge ${st.cls}`}>{st.label}</span>
-                      </div>
-                      <span style={{ color: 'var(--text3)', fontSize: 16, fontWeight: 600 }}>‹</span>
-                    </div>
-                  );
-                })}
-            </>
-          )}
-
-          {!loading && searchStep === 'directions' && searchDirections && (
-            <>
-              <div style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid var(--border)' }}>
-                <button className="search-close" onClick={() => setSearchStep('operators')}><BackIcon size={16} /></button>
-                <span style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.3px' }}>קו {searchLineName} · {searchDirections.opName}</span>
-              </div>
-              {[...searchDirections.routes]
-                .sort((a, b) => {
-                  const order = { active: 0, sparse: 1, inactive: 2 };
-                  return (order[getStatus(a).cls] ?? 2) - (order[getStatus(b).cls] ?? 2);
-                })
-                .map(route => {
-                const cities = extractCities(route.route_long_name);
-                const st = getStatus(route);
-                const alt = route.route_alternative && route.route_alternative !== '#' && route.route_alternative !== '0' ? ` · חלופה ${route.route_alternative}` : '';
-                const hrs = route.firstTime && route.lastTime ? `${route.firstTime.str}-${route.lastTime.str}` : '';
-                return (
-                  <div key={route.line_ref} className="picker-item" style={{ opacity: st.cls === 'inactive' ? 0.35 : 1 }}
-                    onClick={() => {
-                      const c = extractCities(route.route_long_name);
-                      const allSibs = searchDirections.routes.map(r => {
-                        const sc = extractCities(r.route_long_name);
-                        return { lineRef: r.line_ref, from: sc.from, to: sc.to, direction: r.route_direction, alternative: r.route_alternative };
-                      });
-                      startTracking(searchLineName, [route.line_ref], searchDirections.opName, c.from, c.to, allSibs.length > 1 ? allSibs : null);
-                    }}>
-                    <div className="picker-icon" style={{ background: st.cls === 'inactive' ? 'var(--bg-subtle)' : 'rgba(48,209,88,0.08)', fontSize: 22 }}>←</div>
-                    <div className="picker-info">
-                      <div className="picker-title">{cities.from} ← {cities.to}</div>
-                      <div className="picker-sub">כיוון {route.route_direction}{alt}{hrs && <> · <span className="picker-hours">{hrs}</span></>}{route.rideCount > 0 && <> · {route.rideCount} נסיעות</>}</div>
-                      <span className={`status-badge ${st.cls}`}>{st.label}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
+        <SearchOverlay
+          suggestions={suggestions}
+          recentLines={recentLines}
+          onTrackLine={startTracking}
+          onClose={goHome}
+        />
       )}
 
       {/* ── BOTTOM SHEET ── */}

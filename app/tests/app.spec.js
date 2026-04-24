@@ -103,7 +103,8 @@ test.describe('Search Flow', () => {
   test('nonexistent line shows empty', async ({ page }) => {
     await page.goto('/');
     await searchLine(page, '99999');
-    await expect(page.locator('text=לא נמצא')).toBeVisible({ timeout: 20000 });
+    await page.waitForTimeout(5000); // wait for debounce + API
+    await expect(page.locator('text=לא נמצא')).toBeVisible({ timeout: 25000 });
   });
 
   test('Enter triggers search', async ({ page }) => {
