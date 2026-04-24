@@ -310,7 +310,7 @@ export default function App() {
       const refs = [...byLine.keys()];
       if (!refs.length) { setNearbyBuses([]); return; }
       const chunks = []; for (let i = 0; i < refs.length; i += 20) chunks.push(refs.slice(i, i + 20));
-      const rr = await Promise.allSettled(chunks.map(c => api('/gtfs_routes/list', { line_refs: c.join(','), date: today(), limit: 200, order_by: 'date desc' })));
+      const rr = await Promise.allSettled(chunks.map(c => apiFetch('/gtfs_routes/list', { line_refs: c.join(','), date: today(), limit: 200, order_by: 'date desc' })));
       const nameMap = new Map();
       for (const r of rr) if (r.status === 'fulfilled') for (const rt of r.value) if (!nameMap.has(rt.line_ref)) nameMap.set(rt.line_ref, rt);
 
@@ -487,8 +487,8 @@ export default function App() {
       const enriched = await Promise.all(unique.map(async r => {
         try {
           const [first, last] = await Promise.all([
-            api('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time asc' }),
-            api('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time desc' }),
+            apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time asc' }),
+            apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 1, order_by: 'start_time desc' }),
           ]);
           const allR = await apiFetch('/gtfs_rides/list', { gtfs_route_id: r.id, limit: 200 });
           return {
@@ -673,7 +673,7 @@ export default function App() {
       const now = new Date();
       const from = new Date(now.getTime() - 5 * 60000);
       const results = await Promise.allSettled(refs.map(lr =>
-        api('/siri_vehicle_locations/list', {
+        apiFetch('/siri_vehicle_locations/list', {
           siri_routes__line_ref: lr,
           recorded_at_time_from: from.toISOString(),
           recorded_at_time_to: now.toISOString(),
@@ -713,7 +713,7 @@ export default function App() {
 
       // Fetch rides from all route IDs
       const allRides = (await Promise.allSettled(
-        routeIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
+        routeIds.map(rid => apiFetch('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
       )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
       // Also try fetching next 3 days' rides (for Shabbat → Sunday gaps)
@@ -725,7 +725,7 @@ export default function App() {
           const futureIds = futureRoutes.filter(r => r.date === futureDay).map(r => r.id);
           if (futureIds.length) {
             const futureRides = (await Promise.allSettled(
-              futureIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
+              futureIds.map(rid => apiFetch('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
             )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
             allRides.push(...futureRides);
             break; // found data, no need to check further
