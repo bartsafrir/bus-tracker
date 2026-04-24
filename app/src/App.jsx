@@ -758,13 +758,24 @@ export default function App() {
       {/* ── LOCATION FAB ── */}
       <button className="location-fab" onClick={() => {
         if (savedLoc) {
+          // Double-tap: re-acquire GPS. Single tap: fly to saved.
           setFlyToTrigger(t => t + 1);
-        } else {
+        }
+        // Always try GPS (even if we have a saved loc, update it)
+        if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
-            pos => { saveLocation(pos.coords.latitude, pos.coords.longitude); setFlyToTrigger(t => t + 1); },
-            () => setPinMode(true),
-            { enableHighAccuracy: true, timeout: 8000 }
+            pos => {
+              saveLocation(pos.coords.latitude, pos.coords.longitude);
+              setFlyToTrigger(t => t + 1);
+            },
+            (err) => {
+              console.warn('Geolocation error:', err.code, err.message);
+              if (!savedLoc) setPinMode(true);
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
           );
+        } else if (!savedLoc) {
+          setPinMode(true);
         }
       }}>
         <LocationIcon size={20} color="var(--text1)" />
