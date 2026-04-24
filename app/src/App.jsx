@@ -327,6 +327,85 @@ export default function App() {
     return () => clearInterval(nearbyTimer.current);
   }, [loadNearby]);
 
+  // ─── Live data for suggestions ───
+  const [suggestionsLive, setSuggestionsLive] = useState({});
+
+  useEffect(() => {
+    if (!suggestions.length || !savedLoc) return;
+    let cancelled = false;
+
+    async function loadSuggestionsLive() {
+      const data = {};
+      await Promise.allSettled(suggestions.slice(0, 4).map(async s => {
+        try {
+          // Get live vehicles for this line
+          const now = new Date();
+          const from = new Date(now.getTime() - 5 * 60000);
+          const locs = await api('/siri_vehicle_locations/list', {
+            siri_routes__line_ref: s.lineRef,
+            recorded_at_time_from: from.toISOString(),
+            recorded_at_time_to: now.toISOString(),
+            limit: 20,
+          });
+          const vehicles = latestPerVehicle(locs);
+
+          // Get stops to find nearest stop to user
+          const todayRoutes = await api('/gtfs_routes/list', { line_refs: s.lineRef, date: today(), limit: 1, order_by: 'date desc' });
+          const routeId = todayRoutes[0]?.id;
+          if (!routeId) return;
+          const rides = await api('/gtfs_rides/list', { gtfs_route_id: routeId, limit: 1 });
+          if (!rides.length) return;
+          const rideStops = await api('/gtfs_ride_stops/list', { gtfs_ride_ids: rides[0].id, limit: 200 });
+          const validStops = rideStops.filter(st => st.gtfs_stop__lat && st.gtfs_stop__lon).sort((a, b) => a.stop_sequence - b.stop_sequence);
+          if (!validStops.length) return;
+
+          // Find nearest stop to user
+          let minD = Infinity, nearestStop = null;
+          for (const st of validStops) {
+            const d = distanceM(savedLoc.lat, savedLoc.lon, st.gtfs_stop__lat, st.gtfs_stop__lon);
+            if (d < minD) { minD = d; nearestStop = st; }
+          }
+
+          // Find nearest vehicle approaching (simple: closest by straight line)
+          let bestEta = null;
+          if (vehicles.length && nearestStop) {
+            const stopIdx = validStops.findIndex(st => st.id === nearestStop.id);
+            for (const v of vehicles) {
+              // Find which stop bus is nearest to
+              let busMinD = Infinity, busIdx = -1;
+              for (let i = 0; i < validStops.length; i++) {
+                const d = distanceM(v.lat, v.lon, validStops[i].gtfs_stop__lat, validStops[i].gtfs_stop__lon);
+                if (d < busMinD) { busMinD = d; busIdx = i; }
+              }
+              if (busIdx >= 0 && busIdx < stopIdx && rides[0].start_time) {
+                // Bus is before our stop — estimate using schedule
+                const refStart = new Date(rides[0].start_time).getTime();
+                const busOff = validStops[busIdx].arrival_time ? new Date(validStops[busIdx].arrival_time).getTime() - refStart : 0;
+                const stopOff = nearestStop.arrival_time ? new Date(nearestStop.arrival_time).getTime() - refStart : 0;
+                const eta = Math.round((stopOff - busOff) / 60000);
+                if (eta > 0 && eta < 60 && (!bestEta || eta < bestEta)) bestEta = eta;
+              }
+            }
+          }
+
+          if (!cancelled) {
+            data[s.lineRef] = {
+              liveCount: vehicles.length,
+              stopName: nearestStop?.gtfs_stop__name || null,
+              stopCode: nearestStop?.gtfs_stop__code || null,
+              eta: bestEta,
+            };
+          }
+        } catch (e) { /* non-critical */ }
+      }));
+      if (!cancelled) setSuggestionsLive(data);
+    }
+
+    loadSuggestionsLive();
+    const iv = setInterval(loadSuggestionsLive, 30000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [suggestions, savedLoc]);
+
   // ─── UI state ───
   const [view, setView] = useState('home'); // home | search | tracking | schedule
   const [loading, setLoading] = useState(false);
@@ -1132,13 +1211,30 @@ export default function App() {
                   <div className="section-hdr">✦ מוצע עבורך</div>
                   {suggestions.map(s => {
                     const c = getOperatorColor(s.agencyName);
+                    const live = suggestionsLive[s.lineRef];
                     return (
                       <div key={s.lineRef} className="row" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
                         <div className="badge-line" style={{ background: c.bg }}>{s.lineName}</div>
                         <div className="row-info">
                           <div className="row-name">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
-                          <div className="row-detail">{s.agencyName}</div>
+                          <div className="row-detail">
+                            {s.agencyName}
+                            {live?.stopName && ` · ${live.stopName}`}
+                          </div>
                         </div>
+                        {live?.liveCount > 0 && (
+                          <div className="row-right">
+                            {live.eta != null ? (
+                              <>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}><span className="live-badge">LIVE</span></div>
+                                <div className="row-eta">{live.eta}</div>
+                                <div className="row-unit">דק'</div>
+                              </>
+                            ) : (
+                              <span className="live-badge">LIVE</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
