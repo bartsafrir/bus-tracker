@@ -30,31 +30,60 @@ async function apiFetch(endpoint, params = {}) {
 import { getRoute } from './utils/polyline';
 import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
-// Post-process OSRM route: detect and remove loops.
-// A loop = the path revisits a point it was near earlier.
-function removeLoops(path) {
+// Post-process OSRM route: remove loops, then re-attach orphaned stops.
+function removeLoops(path, stopCoords) {
   if (path.length < 10) return path;
-  const GRID = 0.0003; // ~30m grid cells
+  const GRID = 0.0003; // ~30m
   const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
 
-  const result = [];
+  // Step 1: remove loops (path revisits a grid cell)
+  const cleaned = [];
   let i = 0;
   while (i < path.length) {
-    result.push(path[i]);
+    cleaned.push(path[i]);
     const key = cellKey(path[i][0], path[i][1]);
     let jumpTo = -1;
     for (let j = i + 10; j < Math.min(i + 150, path.length); j++) {
-      if (cellKey(path[j][0], path[j][1]) === key) {
-        jumpTo = j;
-      }
+      if (cellKey(path[j][0], path[j][1]) === key) jumpTo = j;
     }
-    if (jumpTo > 0) {
-      i = jumpTo + 1;
-    } else {
-      i++;
+    i = jumpTo > 0 ? jumpTo + 1 : i + 1;
+  }
+  if (cleaned.length < 2) return path;
+  if (!stopCoords?.length) return cleaned;
+
+  // Step 2: find stops that are now too far from the cleaned path (>60m)
+  // For each stop, find the closest point on the cleaned path
+  const MAX_DIST = 60;
+  const result = [];
+  let pathIdx = 0;
+
+  for (let s = 0; s < stopCoords.length; s++) {
+    const stop = stopCoords[s];
+
+    // Find closest point on cleaned path from current position onward
+    let bestIdx = pathIdx, bestDist = Infinity;
+    for (let p = pathIdx; p < cleaned.length; p++) {
+      const d = distanceM(stop[0], stop[1], cleaned[p][0], cleaned[p][1]);
+      if (d < bestDist) { bestDist = d; bestIdx = p; }
+      // Don't look too far ahead
+      if (p > pathIdx + 200) break;
+    }
+
+    // Add path up to closest point
+    for (let p = pathIdx; p <= bestIdx; p++) result.push(cleaned[p]);
+    pathIdx = bestIdx + 1;
+
+    // If stop is too far from path, add a spur: path→stop→path
+    if (bestDist > MAX_DIST) {
+      result.push(stop); // go to stop
+      if (bestIdx + 1 < cleaned.length) result.push(cleaned[bestIdx + 1]); // come back
     }
   }
-  return result.length > 1 ? result : path;
+
+  // Add remaining path
+  for (let p = pathIdx; p < cleaned.length; p++) result.push(cleaned[p]);
+
+  return result.length > 1 ? result : cleaned;
 }
 
 // ─── Leaflet icons ───
@@ -502,7 +531,7 @@ export default function App() {
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
               const raw = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-              const clean = removeLoops(raw);
+              const clean = removeLoops(raw, stopCoords);
               setRouteCoords(clean);
               setCachedRoute(stopCoords, 'bus', clean);
             }
