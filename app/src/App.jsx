@@ -715,7 +715,20 @@ export default function App() {
         routeIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
       )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
-      // Deduplicate by start_time (different alts at same time = same bus)
+      // Also fetch NEXT day's rides (for when today's are all past, e.g., Saturday evening)
+      const todayDate = today();
+      const nextDay = new Date(new Date(todayDate).getTime() + 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+      const sibRefs = tracked?.siblings?.map(s => s.lineRef) || tracked?.lineRefs || [];
+      const nextDayRoutes = await api('/gtfs_routes/list', { line_refs: [...new Set([...sibRefs, ...tracked?.lineRefs || []])].join(','), date: nextDay, limit: 50, order_by: 'date desc' }).catch(() => []);
+      const nextDayRouteIds = nextDayRoutes.filter(r => r.date === nextDay).map(r => r.id);
+      if (nextDayRouteIds.length) {
+        const nextRides = (await Promise.allSettled(
+          nextDayRouteIds.map(rid => api('/gtfs_rides/list', { gtfs_route_id: rid, limit: 200, order_by: 'start_time asc' }))
+        )).flatMap(r => r.status === 'fulfilled' ? r.value : []);
+        allRides.push(...nextRides);
+      }
+
+      // Deduplicate by start_time
       const seen = new Set();
       const starts = allRides
         .filter(r => r.start_time)
@@ -1436,15 +1449,31 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* No more rides today */}
-                    {upcoming.length === 0 && past.length > 0 && (
-                      <div style={{ padding: '20px 24px', textAlign: 'center' }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 }}>אין נסיעות נוספות היום</div>
-                        <div style={{ fontSize: 13, color: 'var(--text2)' }}>
-                          {schedule[0] ? `מחר הנסיעה הראשונה ב-${schedule[0].str}` : 'בדוק שוב מחר'}
+                    {/* No more rides — show when next ride is */}
+                    {upcoming.length === 0 && past.length > 0 && (() => {
+                      // Find the first future ride from the full schedule (including next day)
+                      const nextRide = schedule.find(a => a.diffMin > 0);
+                      const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+                      let nextLabel = '';
+                      if (nextRide) {
+                        const rideDate = new Date(nextRide.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+                        const dayNames = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+                        const rideDay = new Date(nextRide.arrivalMs).toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem', weekday: 'long' });
+                        if (rideDate === todayIL) nextLabel = `הנסיעה הבאה היום ב-${nextRide.str}`;
+                        else {
+                          const tomorrow = new Date(new Date(todayIL).getTime() + 86400000).toLocaleDateString('en-CA');
+                          nextLabel = rideDate === tomorrow ? `מחר ב-${nextRide.str}` : `יום ${rideDay} ב-${nextRide.str}`;
+                        }
+                      }
+                      return (
+                        <div style={{ padding: '20px 24px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text1)', marginBottom: 6 }}>אין נסיעות פעילות כרגע</div>
+                          <div style={{ fontSize: 13, color: 'var(--text2)' }}>
+                            {nextLabel || 'בדוק שוב מאוחר יותר'}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Upcoming */}
                     {upcoming.map((a, i) => {
