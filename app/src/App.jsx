@@ -1129,20 +1129,15 @@ export default function App() {
               {/* Smart suggestions */}
               {suggestions.length > 0 && (
                 <>
-                  <div className="section-hdr">מוצע עבורך</div>
+                  <div className="section-hdr">✦ מוצע עבורך</div>
                   {suggestions.map(s => {
                     const c = getOperatorColor(s.agencyName);
-                    const hourStr = `${String(s.typicalHour).padStart(2,'0')}:00`;
                     return (
                       <div key={s.lineRef} className="row" onClick={() => startTracking(s.lineName, [s.lineRef], s.agencyName, s.from, s.to)}>
                         <div className="badge-line" style={{ background: c.bg }}>{s.lineName}</div>
                         <div className="row-info">
                           <div className="row-name">{s.from ? fmtDir(s.from, s.to) : s.agencyName}</div>
-                          <div className="row-detail">
-                            {s.agencyName}
-                            {s.count > 1 ? ` · ×${s.count}` : ''}
-                            {s.count > 1 && s.typicalHour != null ? ` · בד״כ ${hourStr}` : ''}
-                          </div>
+                          <div className="row-detail">{s.agencyName}</div>
                         </div>
                       </div>
                     );
