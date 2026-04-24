@@ -465,15 +465,42 @@ export default function App() {
     setLoading(false);
   }
 
-  // Recalculate closest stop when location or stops change
+  // Recalculate closest stop by walking distance (OSRM table API)
   useEffect(() => {
     if (!savedLoc || !stops.length) return;
-    let minD = Infinity, cl = null;
+    let cancelled = false;
+
+    // First: quick straight-line pick as immediate fallback
+    let minD = Infinity, quickCl = null;
     for (const s of stops) {
       const d = distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon);
-      if (d < minD) { minD = d; cl = s; }
+      if (d < minD) { minD = d; quickCl = s; }
     }
-    setClosestStop(cl);
+    setClosestStop(quickCl);
+
+    // Then: get real walking distances from OSRM (top 10 nearest by straight line)
+    async function calcWalkDist() {
+      const ranked = stops
+        .map(s => ({ s, d: distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 10);
+
+      const pts = [`${savedLoc.lon},${savedLoc.lat}`, ...ranked.map(r => `${r.s.gtfs_stop__lon},${r.s.gtfs_stop__lat}`)].join(';');
+      try {
+        const res = await fetch(`https://router.project-osrm.org/table/v1/foot/${pts}?sources=0&annotations=duration,distance`);
+        const data = await res.json();
+        if (cancelled || data.code !== 'Ok') return;
+
+        const distances = data.distances[0]; // [0, d1, d2, ...]
+        let bestIdx = 0, bestDist = Infinity;
+        for (let i = 1; i < distances.length; i++) {
+          if (distances[i] < bestDist) { bestDist = distances[i]; bestIdx = i - 1; }
+        }
+        setClosestStop(ranked[bestIdx].s);
+      } catch { /* keep straight-line pick */ }
+    }
+    calcWalkDist();
+    return () => { cancelled = true; };
   }, [savedLoc, stops]);
 
   // Fetch walking route to closest stop
