@@ -545,8 +545,12 @@ export default function App() {
   // Fetch walking route to closest stop
   useEffect(() => {
     if (!savedLoc || !closestStop) { setWalkRoute(null); return; }
+    let cancelled = false;
+    setWalkRoute(null); // reset while loading
     getRoute([[savedLoc.lat, savedLoc.lon], [closestStop.gtfs_stop__lat, closestStop.gtfs_stop__lon]], 'foot')
-      .then(path => setWalkRoute(path));
+      .then(path => { if (!cancelled && path) setWalkRoute(path); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [savedLoc, closestStop]);
 
   // Watch GPS position continuously (disabled in dev mode — manual location only)

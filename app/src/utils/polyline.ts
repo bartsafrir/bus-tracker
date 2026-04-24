@@ -31,7 +31,12 @@ export async function getRoute(
 
   const allCoords: [number, number][] = [];
   for (const chunk of chunks) {
-    const locations = chunk.map(c => ({ lat: c[0], lon: c[1] }));
+    // Mark intermediate waypoints as "through" to avoid detours/loops
+    const locations = chunk.map((c, i) => {
+      const loc: any = { lat: c[0], lon: c[1] };
+      if (i > 0 && i < chunk.length - 1) loc.type = 'through';
+      return loc;
+    });
     const body = JSON.stringify({ locations, costing, directions_options: { units: 'km' } });
     try {
       const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
