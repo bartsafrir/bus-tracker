@@ -55,25 +55,33 @@ function decodePolyline(str) {
 // Routing via Valhalla (real pedestrian + bus profiles)
 async function getRoute(coords, profile = 'auto') {
   if (coords.length < 2) return null;
-  // Valhalla costing: pedestrian, bus, auto
   const costing = profile === 'foot' ? 'pedestrian' : profile === 'bus' ? 'bus' : 'auto';
-  const locations = coords.slice(0, 50).map(c => ({ lat: c[0], lon: c[1] }));
-  const body = JSON.stringify({ locations, costing, directions_options: { units: 'km' } });
-  try {
-    const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
-    const data = await res.json();
-    if (!data.trip?.legs?.length) return null;
-    // Combine all legs into one path
-    const allCoords = [];
-    for (const leg of data.trip.legs) {
-      if (leg.shape) {
-        const pts = decodePolyline(leg.shape);
-        // Skip first point of subsequent legs (same as last of previous)
-        allCoords.push(...(allCoords.length ? pts.slice(1) : pts));
+  const CHUNK = 45; // Valhalla limit ~50, use 45 for safety
+
+  // Split into overlapping chunks if needed
+  const chunks = [];
+  for (let i = 0; i < coords.length; i += CHUNK - 1) {
+    chunks.push(coords.slice(i, i + CHUNK));
+    if (i + CHUNK >= coords.length) break;
+  }
+
+  const allCoords = [];
+  for (const chunk of chunks) {
+    const locations = chunk.map(c => ({ lat: c[0], lon: c[1] }));
+    const body = JSON.stringify({ locations, costing, directions_options: { units: 'km' } });
+    try {
+      const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
+      const data = await res.json();
+      if (!data.trip?.legs?.length) continue;
+      for (const leg of data.trip.legs) {
+        if (leg.shape) {
+          const pts = decodePolyline(leg.shape);
+          allCoords.push(...(allCoords.length ? pts.slice(1) : pts));
+        }
       }
-    }
-    return allCoords.length > 1 ? allCoords : null;
-  } catch { return null; }
+    } catch { /* continue with next chunk */ }
+  }
+  return allCoords.length > 1 ? allCoords : null;
 }
 
 // ─── Leaflet icons ───
