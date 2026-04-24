@@ -17,11 +17,11 @@ export function decodePolyline(str: string): [number, number][] {
 // Routing via Valhalla (real pedestrian + bus profiles)
 export async function getRoute(
   coords: [number, number][],
-  profile: 'foot' | 'bus' | 'auto' = 'auto'
+  profile: 'foot' | 'bus' | 'auto' | string = 'auto'
 ): Promise<[number, number][] | null> {
   if (coords.length < 2) return null;
   const costing = profile === 'foot' ? 'pedestrian' : profile === 'bus' ? 'bus' : 'auto';
-  const CHUNK = 45;
+  const CHUNK = 18; // Valhalla public server limit is 20
 
   const chunks: [number, number][][] = [];
   for (let i = 0; i < coords.length; i += CHUNK - 1) {
