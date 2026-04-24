@@ -463,7 +463,8 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        getRoute(stopCoords, 'auto').then(path => { if (path) setRouteCoords(path); });
+        // Straight lines between stops — clean and accurate
+        // (Routing engines create false loops when stop GPS is slightly off-road)
 
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
         const offsets = new Map();
@@ -832,7 +833,7 @@ export default function App() {
           }} />
         )}
 
-        {routeCoords.length > 1 && <Polyline positions={routeCoords} pathOptions={{ color: opColor, weight: 4, opacity: 0.6, lineCap: 'round', lineJoin: 'round' }} />}
+        {routeCoords.length > 1 && <Polyline positions={routeCoords} pathOptions={{ color: opColor, weight: 5, opacity: 0.5, lineCap: 'round', lineJoin: 'round' }} />}
 
         {stops.map(s => (
           <Marker key={s.id} position={[s.gtfs_stop__lat, s.gtfs_stop__lon]}
