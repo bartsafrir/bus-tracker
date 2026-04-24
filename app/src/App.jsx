@@ -30,45 +30,38 @@ async function apiFetch(endpoint, params = {}) {
 import { getRoute } from './utils/polyline';
 import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
-// Post-process OSRM route: detect and remove loops that don't contain stops.
-// A loop = the path revisits a grid cell it already passed through.
-// Only remove if no bus stops are inside the loop area.
-function removeLoops(path, stopCoords) {
-  if (path.length < 10) return path;
-  const GRID = 0.0004; // ~40m grid cells
-  const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
+// Post-process: for each pair of consecutive OSRM waypoints,
+// if the routed path between them is >2.5x the straight-line distance,
+// the segment likely has a loop — replace with straight line.
+function removeLoops(routePath, stopCoords, waypoints) {
+  if (!waypoints || waypoints.length < 2) return routePath;
 
-  // Pre-compute which grid cells contain stops
-  const stopCells = new Set();
-  for (const s of stopCoords) stopCells.add(cellKey(s[0], s[1]));
-
+  // OSRM returns waypoint_index into the route path for each input stop
   const result = [];
-  let i = 0;
-  while (i < path.length) {
-    result.push(path[i]);
-    const key = cellKey(path[i][0], path[i][1]);
-    let jumpTo = -1;
+  for (let w = 0; w < waypoints.length - 1; w++) {
+    const startIdx = waypoints[w].waypoint_index;
+    const endIdx = waypoints[w + 1].waypoint_index;
+    if (startIdx == null || endIdx == null || endIdx <= startIdx) continue;
 
-    // Look ahead for revisit of same cell
-    for (let j = i + 8; j < Math.min(i + 120, path.length); j++) {
-      if (cellKey(path[j][0], path[j][1]) === key) {
-        // Check if any stops are inside this loop segment
-        let hasStop = false;
-        for (let k = i + 1; k < j; k++) {
-          if (stopCells.has(cellKey(path[k][0], path[k][1]))) { hasStop = true; break; }
-        }
-        // Only remove if no stops inside — it's a routing artifact
-        if (!hasStop) { jumpTo = j; break; }
-      }
+    const segment = routePath.slice(startIdx, endIdx + 1);
+    const straightDist = distanceM(stopCoords[w][0], stopCoords[w][1], stopCoords[w + 1][0], stopCoords[w + 1][1]);
+
+    // Calculate routed distance for this segment
+    let routedDist = 0;
+    for (let i = 1; i < segment.length; i++) {
+      routedDist += distanceM(segment[i - 1][0], segment[i - 1][1], segment[i][0], segment[i][1]);
     }
 
-    if (jumpTo > 0) {
-      i = jumpTo + 1;
+    if (straightDist > 0 && routedDist / straightDist > 2.5) {
+      // Loop detected — just use straight line for this segment
+      result.push(routePath[startIdx]);
     } else {
-      i++;
+      // Clean segment — keep routed path
+      const start = result.length === 0 ? 0 : 1; // skip first if overlaps
+      for (let i = start; i < segment.length; i++) result.push(segment[i]);
     }
   }
-  return result.length > 1 ? result : path;
+  return result.length > 1 ? result : routePath;
 }
 
 // ─── Leaflet icons ───
@@ -516,7 +509,7 @@ export default function App() {
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
               const raw = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-              const clean = removeLoops(raw, stopCoords);
+              const clean = removeLoops(raw, stopCoords, data.waypoints);
               setRouteCoords(clean);
               setCachedRoute(stopCoords, 'bus', clean);
             }
