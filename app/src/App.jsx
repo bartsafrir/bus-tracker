@@ -1369,7 +1369,7 @@ export default function App() {
                 <div className="stop-card">
                   <div>
                     <div className="stop-name">{closestStop.gtfs_stop__name || 'תחנה'}{closestStop.gtfs_stop__city ? `, ${closestStop.gtfs_stop__city}` : ''}</div>
-                    <div className="stop-sub"><WalkIcon size={13} color="var(--walk-text)" /> {walkMin != null ? `${walkMin} דק' הליכה` : 'התחנה הקרובה'}{walkDist != null ? ` · ${walkDist < 1000 ? Math.round(walkDist) + ' מ\'' : (walkDist/1000).toFixed(1) + ' ק"מ'}` : ''}</div>
+                    <div className="stop-sub">{closestStop.gtfs_stop__code ? `תחנה ${closestStop.gtfs_stop__code} · ` : ''}<WalkIcon size={13} color="var(--walk-text)" /> {walkMin != null ? `${walkMin} דק' הליכה` : 'התחנה הקרובה'}{walkDist != null ? ` · ${walkDist < 1000 ? Math.round(walkDist) + ' מ\'' : (walkDist/1000).toFixed(1) + ' ק"מ'}` : ''}</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     {liveEta != null ? (
