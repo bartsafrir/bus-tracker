@@ -38,3 +38,14 @@ export function formatCountdown(diffMinutes) {
   if (diffMinutes < 60) return `בעוד ${diffMinutes} דק'`;
   return `בעוד ${Math.floor(diffMinutes / 60)} שע' ${diffMinutes % 60} דק'`;
 }
+
+// GTFS service day: use Israel date. Before 4am = previous day.
+export function today(): string {
+  const now = new Date();
+  const ilHour = parseInt(now.toLocaleString('en', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }));
+  if (ilHour < 4) {
+    const yesterday = new Date(now.getTime() - 86400000);
+    return yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+  }
+  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
+}

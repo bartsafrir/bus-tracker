@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import { FitBoundsOnChange, FlyToLocation, MapClickHandler } from './components/Map/MapControls';
 import L from 'leaflet';
 import { getOperatorColor } from './utils/operators';
 import { toIsraelTime, israelNow, formatCountdown } from './utils/time';
@@ -23,66 +24,10 @@ async function apiFetch(endpoint, params = {}) {
   } finally { clearTimeout(t); }
 }
 
-// GTFS service day: use Israel date. After midnight Israel, late-night buses
-// are still part of the previous day's schedule until ~4am.
-function today() {
-  const now = new Date();
-  const ilHour = parseInt(now.toLocaleString('en', { timeZone: 'Asia/Jerusalem', hour: '2-digit', hour12: false }));
-  // Before 4am Israel = still the previous service day
-  if (ilHour < 4) {
-    const yesterday = new Date(now.getTime() - 86400000);
-    return yesterday.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }); // YYYY-MM-DD
-  }
-  return now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
-}
+// today() imported from utils/time
 
-// OSRM routing — returns [[lat,lon],...] or null
-// Decode Valhalla encoded polyline (precision 6)
-function decodePolyline(str) {
-  const coords = []; let lat = 0, lon = 0, i = 0;
-  while (i < str.length) {
-    let b, shift = 0, result = 0;
-    do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
-    shift = 0; result = 0;
-    do { b = str.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lon += (result & 1) ? ~(result >> 1) : (result >> 1);
-    coords.push([lat / 1e6, lon / 1e6]);
-  }
-  return coords;
-}
-
-// Routing via Valhalla (real pedestrian + bus profiles)
-async function getRoute(coords, profile = 'auto') {
-  if (coords.length < 2) return null;
-  const costing = profile === 'foot' ? 'pedestrian' : profile === 'bus' ? 'bus' : 'auto';
-  const CHUNK = 45; // Valhalla limit ~50, use 45 for safety
-
-  // Split into overlapping chunks if needed
-  const chunks = [];
-  for (let i = 0; i < coords.length; i += CHUNK - 1) {
-    chunks.push(coords.slice(i, i + CHUNK));
-    if (i + CHUNK >= coords.length) break;
-  }
-
-  const allCoords = [];
-  for (const chunk of chunks) {
-    const locations = chunk.map(c => ({ lat: c[0], lon: c[1] }));
-    const body = JSON.stringify({ locations, costing, directions_options: { units: 'km' } });
-    try {
-      const res = await fetch(`https://valhalla1.openstreetmap.de/route?json=${encodeURIComponent(body)}`);
-      const data = await res.json();
-      if (!data.trip?.legs?.length) continue;
-      for (const leg of data.trip.legs) {
-        if (leg.shape) {
-          const pts = decodePolyline(leg.shape);
-          allCoords.push(...(allCoords.length ? pts.slice(1) : pts));
-        }
-      }
-    } catch { /* continue with next chunk */ }
-  }
-  return allCoords.length > 1 ? allCoords : null;
-}
+// Routing imported from utils
+import { getRoute } from './utils/polyline';
 
 // ─── Leaflet icons ───
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
@@ -105,51 +50,10 @@ function makeBusIcon(bearing, color, lineNum) {
   });
 }
 
-// ─── Map helpers ───
-function FitBoundsOnChange({ coords, trigger }) {
-  const map = useMap();
-  const lastTrigger = useRef(null);
-  useEffect(() => {
-    if (!coords.length || trigger === lastTrigger.current) return;
-    lastTrigger.current = trigger;
-    const b = L.latLngBounds(coords);
-    if (b.isValid()) map.fitBounds(b, { padding: [50, 50], maxZoom: 15 });
-  }, [coords, trigger, map]);
-  return null;
-}
 
-function FlyToLocation({ lat, lon, trigger }) {
-  const map = useMap();
-  const lastTrigger = useRef(null);
-  useEffect(() => {
-    if (!lat || !lon || trigger === lastTrigger.current) return;
-    lastTrigger.current = trigger;
-    map.flyTo([lat, lon], 16, { duration: 0.8 });
-  }, [lat, lon, trigger, map]);
-  return null;
-}
-
-function MapClickHandler({ onPin, onMapTap }) {
-  useMapEvents({
-    click(e) {
-      if (onPin) onPin(e.latlng.lat, e.latlng.lng);
-      else if (onMapTap) onMapTap();
-    },
-  });
-  return null;
-}
-
-// ─── Keep latest per vehicle ───
-function latestPerVehicle(locs) {
-  const m = new Map();
-  for (const l of locs) {
-    const v = l.siri_ride__vehicle_ref;
-    if (!v) continue;
-    const prev = m.get(v);
-    if (!prev || new Date(l.recorded_at_time) > new Date(prev.recorded_at_time)) m.set(v, l);
-  }
-  return [...m.values()];
-}
+// Imported from utils/routes
+import { latestPerVehicle, extractCities as extractCitiesUtil } from './utils/routes';
+import { today } from './utils/time';
 
 // ═══════════════════════════════════════════
 // APP
