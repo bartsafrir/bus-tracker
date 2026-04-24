@@ -416,15 +416,7 @@ export default function App() {
         }
         setScheduleData({ stopOffsets: offsets, todayGtfsRouteId: routeId, referenceRideStart: refStart });
 
-        // Closest stop
-        if (savedLoc) {
-          let minD = Infinity, cl = null;
-          for (const s of sorted) {
-            const d = distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon);
-            if (d < minD) { minD = d; cl = s; }
-          }
-          setClosestStop(cl);
-        }
+        // closestStop is recalculated by useEffect when savedLoc or stops change
       }
 
       // Fetch all sibling directions (same operator + line name)
@@ -453,6 +445,28 @@ export default function App() {
     } catch (e) { console.error('Track:', e); }
     setLoading(false);
   }
+
+  // Recalculate closest stop when location or stops change
+  useEffect(() => {
+    if (!savedLoc || !stops.length) return;
+    let minD = Infinity, cl = null;
+    for (const s of stops) {
+      const d = distanceM(savedLoc.lat, savedLoc.lon, s.gtfs_stop__lat, s.gtfs_stop__lon);
+      if (d < minD) { minD = d; cl = s; }
+    }
+    setClosestStop(cl);
+  }, [savedLoc, stops]);
+
+  // Watch GPS position continuously
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      pos => saveLocation(pos.coords.latitude, pos.coords.longitude),
+      () => {},
+      { enableHighAccuracy: false, maximumAge: 30000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
   async function refreshVehicles(lineRefs) {
     const refs = lineRefs || tracked?.lineRefs;
