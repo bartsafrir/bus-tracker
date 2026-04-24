@@ -470,7 +470,8 @@ export default function App() {
           if (cached) { setRouteCoords(cached); return; }
           try {
             const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
-            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true`);
+            const approaches = stopCoords.map(() => 'unrestricted').join(';');
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true&approaches=${approaches}`);
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
               const path = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
