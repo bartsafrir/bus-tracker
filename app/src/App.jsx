@@ -463,8 +463,17 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Straight lines between stops — clean and accurate
-        // (Routing engines create false loops when stop GPS is slightly off-road)
+        // Snap route to roads via OSRM (no waypoint limit, continue_straight avoids loops)
+        (async () => {
+          try {
+            const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
+            const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true`);
+            const data = await res.json();
+            if (data.routes?.[0]?.geometry?.coordinates) {
+              setRouteCoords(data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]));
+            }
+          } catch { /* keep straight lines as fallback */ }
+        })();
 
         const refStart = rides[0].start_time ? new Date(rides[0].start_time).getTime() : null;
         const offsets = new Map();

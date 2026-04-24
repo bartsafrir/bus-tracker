@@ -124,7 +124,7 @@ body {
 }
 
 /* ═══ MAP ═══ */
-.the-map { position: absolute; inset: 0; z-index: 0; }
+.the-map { position: absolute; inset: 0; z-index: 0; background: var(--bg); }
 
 .bus-chip {
   position: relative;
