@@ -30,6 +30,40 @@ async function apiFetch(endpoint, params = {}) {
 import { getRoute } from './utils/polyline';
 import { getCachedRoute, setCachedRoute } from './utils/routeCache';
 
+// Post-process OSRM route: detect and remove loops.
+// A loop = the path revisits a point it was near earlier.
+// We use a spatial grid: if the path enters a cell it already visited
+// AND the direction reversed, cut out the loop segment.
+function removeLoops(path) {
+  if (path.length < 10) return path;
+  const GRID = 0.0003; // ~30m grid cells
+  const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
+
+  // Pass 1: for each point, find if a later point is in the same cell
+  // If so, everything between them is a loop — remove it.
+  const result = [];
+  let i = 0;
+  while (i < path.length) {
+    result.push(path[i]);
+    // Look ahead: is there a point >10 steps later in the same cell?
+    const key = cellKey(path[i][0], path[i][1]);
+    let jumpTo = -1;
+    for (let j = i + 10; j < Math.min(i + 150, path.length); j++) {
+      if (cellKey(path[j][0], path[j][1]) === key) {
+        jumpTo = j;
+        // Don't break — find the LAST match (largest loop removal)
+      }
+    }
+    if (jumpTo > 0) {
+      // Skip the loop: jump from i to jumpTo
+      i = jumpTo + 1;
+    } else {
+      i++;
+    }
+  }
+  return result.length > 1 ? result : path;
+}
+
 // ─── Leaflet icons ───
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
 const stopIconSm = L.divIcon({ className: '', html: '<div class="stop-dot"></div>', iconSize: [10, 10], iconAnchor: [5, 5] });
@@ -464,26 +498,20 @@ export default function App() {
         const stopCoords = sorted.map(s => [s.gtfs_stop__lat, s.gtfs_stop__lon]);
         setRouteCoords(stopCoords);
         setFitTrigger(t => t + 1);
-        // Snap route to roads via OSRM route (fast, cached across refreshes)
+        // Snap route to roads via OSRM, then remove loops
         (async () => {
           const cached = getCachedRoute(stopCoords, 'bus');
           if (cached) { setRouteCoords(cached); return; }
           try {
-            // Thin stops: skip stops < 80m from previous (on same road, cause loops)
-            const thinned = [stopCoords[0]];
-            for (let i = 1; i < stopCoords.length; i++) {
-              const prev = thinned[thinned.length - 1];
-              const d = distanceM(prev[0], prev[1], stopCoords[i][0], stopCoords[i][1]);
-              if (d > 80 || i === stopCoords.length - 1) thinned.push(stopCoords[i]);
-            }
-            const pts = thinned.map(c => `${c[1]},${c[0]}`).join(';');
-            const approaches = thinned.map(() => 'unrestricted').join(';');
+            const pts = stopCoords.map(c => `${c[1]},${c[0]}`).join(';');
+            const approaches = stopCoords.map(() => 'unrestricted').join(';');
             const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${pts}?overview=full&geometries=geojson&continue_straight=true&approaches=${approaches}`);
             const data = await res.json();
             if (data.routes?.[0]?.geometry?.coordinates) {
-              const path = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-              setRouteCoords(path);
-              setCachedRoute(stopCoords, 'bus', path);
+              const raw = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+              const clean = removeLoops(raw);
+              setRouteCoords(clean);
+              setCachedRoute(stopCoords, 'bus', clean);
             }
           } catch { /* keep straight lines as fallback */ }
         })();
