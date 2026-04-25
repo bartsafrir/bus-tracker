@@ -63,5 +63,14 @@ export function useNearbyBuses(savedLoc: Position | null) {
     return () => { if (nearbyTimer.current !== null) clearInterval(nearbyTimer.current); };
   }, [loadNearby]);
 
+  // Refresh on app resume (iOS background → foreground)
+  useEffect(() => {
+    function onResume() {
+      if (document.visibilityState === 'visible') loadNearby();
+    }
+    document.addEventListener('visibilitychange', onResume);
+    return () => document.removeEventListener('visibilitychange', onResume);
+  }, [loadNearby]);
+
   return { nearbyBuses };
 }

@@ -146,10 +146,21 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
 
       // Fetch vehicles
       await refreshVehicles(lineRefs);
-      vehicleTimer.current = setInterval(() => refreshVehicles(lineRefs), 30000);
+      vehicleTimer.current = setInterval(() => refreshVehicles(lineRefs), 10000);
     } catch (e) { console.error('Track:', e); }
     setLoading(false);
   }
+
+  // ─── Refresh on app resume (iOS background → foreground) ───
+  useEffect(() => {
+    function onResume() {
+      if (document.visibilityState === 'visible' && tracked?.lineRefs?.length) {
+        refreshVehicles(tracked.lineRefs);
+      }
+    }
+    document.addEventListener('visibilitychange', onResume);
+    return () => document.removeEventListener('visibilitychange', onResume);
+  }, [tracked]);
 
   // ─── Closest stop by walking distance ───
   useEffect(() => {
