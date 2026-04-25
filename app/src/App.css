@@ -383,6 +383,11 @@ body {
 .sc-hero-inner { display: flex; align-items: center; gap: 16px; }
 .sc-hero-info { flex: 1; display: flex; align-items: center; gap: 8px; }
 .sc-stops { font-size: 12px; color: var(--live-text); font-weight: 500; }
+.sc-delay {
+  font-size: 10px; color: #FBBF24; font-weight: 600;
+  background: rgba(245,158,11,0.12); padding: 2px 8px; border-radius: 4px;
+}
+.sc-cancelled-count { color: #F87171; font-weight: 600; }
 .sc-miss {
   font-size: 10px; color: var(--miss-text); font-weight: 500;
   background: var(--status-inactive-bg); padding: 2px 6px; border-radius: 4px;

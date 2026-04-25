@@ -47,7 +47,7 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
     setLoadingMsg('טוען מסלול...');
     const color = getOperatorColor(agencyName);
     setOpColor(color.bg);
-    setTracked({ lineName, lineRefs, agencyName, from: dirFrom || '', to: dirTo || '', siblings: siblings || null });
+    setTracked({ lineName, lineRefs, agencyName, from: dirFrom || '', to: dirTo || '', siblings: siblings || null, operatorRef: null });
     logUsage({ lineName, lineRef: lineRefs[0], agencyName, from: dirFrom || '', to: dirTo || '' });
     setVehicles([]);
     setStops([]);
@@ -63,6 +63,8 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
       // Get today's route ID
       const todayRoutes = await apiFetch('/gtfs_routes/list', { line_refs: lineRefs[0], date: today(), limit: 1, order_by: 'date desc' });
       const routeId = todayRoutes[0]?.id || null;
+      const operatorRef = todayRoutes[0]?.operator_ref || null;
+      if (operatorRef) setTracked(prev => prev ? { ...prev, operatorRef } : prev);
 
       // Get one ride for stops
       const rides = await apiFetch('/gtfs_rides/list', routeId ? { gtfs_route_id: routeId, limit: 1 } : { gtfs_route__line_refs: lineRefs[0], limit: 1 });
@@ -306,6 +308,32 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
         }
       }
 
+      // Fetch rides_execution for cancellation/delay detection
+      const executionMap = new Map<string, { actual: string | null; delayMin: number; cancelled: boolean }>();
+      if (tracked?.operatorRef) {
+        try {
+          const todayDate = today();
+          const allExecLineRefs = [...new Set([...(tracked?.siblings?.map(s => s.lineRef) || []), ...(tracked?.lineRefs || [])])];
+          const execResults = await Promise.allSettled(
+            allExecLineRefs.map(lr =>
+              apiFetch('/rides_execution/list', { date_from: todayDate, date_to: todayDate, operator_ref: tracked.operatorRef, line_ref: lr, limit: 200 })
+            )
+          );
+          for (const r of execResults) {
+            if (r.status !== 'fulfilled') continue;
+            for (const ex of r.value) {
+              if (!ex.planned_start_time) continue;
+              const key = ex.planned_start_time.substring(11, 16); // HH:MM
+              const plannedMs = new Date(ex.planned_start_time).getTime();
+              const actualMs = ex.actual_start_time ? new Date(ex.actual_start_time).getTime() : null;
+              const cancelled = !actualMs && plannedMs < Date.now() - 5 * 60000; // null + past = cancelled
+              const delayMin = actualMs ? Math.round((actualMs - plannedMs) / 60000) : 0;
+              executionMap.set(key, { actual: ex.actual_start_time, delayMin, cancelled });
+            }
+          }
+        } catch { /* non-critical */ }
+      }
+
       const nowMs = Date.now();
       const arr = starts.map(ms => {
         const arrivalMs = ms + info.offsetMs;
@@ -320,7 +348,11 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
           if (result?.passed) passed = true;
           else if (result?.eta) { liveEtaVal = result.eta; stopsAway = result.stopsAway; }
         }
-        return { ...il, live, liveEta: liveEtaVal, passed, stopsAway, diffMin, arrivalMs };
+        // Merge cancellation/delay data
+        const exec = executionMap.get(key);
+        const cancelled = exec?.cancelled || false;
+        const delayMin = exec?.delayMin || 0;
+        return { ...il, live, liveEta: liveEtaVal, passed, stopsAway, diffMin, arrivalMs, cancelled, delayMin };
       }).sort((a, b) => a.arrivalMs - b.arrivalMs);
 
       setSchedule(arr);
@@ -339,20 +371,37 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
     if (vehicleTimer.current !== null) clearInterval(vehicleTimer.current);
   }
 
-  // ═══ SCHEDULE-BASED ETA ═══
-  function findNearestStopIndex(lat, lon) {
+  // ═══ SMART ETA ═══
+  // Find bus position along route by distance_from_journey_start vs shape_dist_traveled
+  // Falls back to GPS nearest-stop when distance data is missing
+  function findBusStopIndex(vehicle) {
+    if (!stops.length) return { index: -1, distance: Infinity };
+    const busDist = vehicle.distance_from_journey_start;
+
+    // Try distance-based matching first (more accurate than GPS)
+    if (busDist != null && busDist > 0) {
+      let bestIdx = 0;
+      for (let i = 0; i < stops.length; i++) {
+        const sd = scheduleData?.stopOffsets?.get(stops[i].gtfs_stop_id)?.shapeDist;
+        if (sd != null && sd <= busDist) bestIdx = i;
+        else if (sd != null && sd > busDist) break;
+      }
+      return { index: bestIdx, distance: 0, byDistance: true };
+    }
+
+    // Fallback: GPS nearest stop
     let minD = Infinity, idx = -1;
     for (let i = 0; i < stops.length; i++) {
-      const d = distanceM(lat, lon, stops[i].gtfs_stop__lat, stops[i].gtfs_stop__lon);
+      const d = distanceM(vehicle.lat, vehicle.lon, stops[i].gtfs_stop__lat, stops[i].gtfs_stop__lon);
       if (d < minD) { minD = d; idx = i; }
     }
-    return { index: idx, distance: minD };
+    return { index: idx, distance: minD, byDistance: false };
   }
 
   function calcScheduleEta(vehicle, targetStop) {
     if (!stops.length || !scheduleData?.stopOffsets) return null;
 
-    const busPos = findNearestStopIndex(vehicle.lat, vehicle.lon);
+    const busPos = findBusStopIndex(vehicle);
     if (busPos.index < 0) return null;
 
     const targetIdx = stops.findIndex(s => s.id === targetStop.id);
@@ -366,12 +415,29 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
     const targetOffset = scheduleData.stopOffsets.get(targetStopId);
     if (!busOffset || !targetOffset) return null;
 
-    const scheduledMinutes = Math.round((targetOffset.offsetMs - busOffset.offsetMs) / 60000);
+    // Schedule-based ETA (time between stops per timetable)
+    const scheduleEta = Math.round((targetOffset.offsetMs - busOffset.offsetMs) / 60000);
+    if (scheduleEta <= 0) return { passed: true };
+    if (scheduleEta > 90) return null;
 
-    if (scheduledMinutes <= 0) return { passed: true };
-    if (scheduledMinutes > 90) return null;
+    // Speed-based ETA using distance + velocity
+    let eta = scheduleEta;
+    const busDist = vehicle.distance_from_journey_start;
+    const targetDist = targetOffset.shapeDist;
+    const velocity = vehicle.velocity; // km/h
 
-    return { eta: scheduledMinutes, stopsAway: targetIdx - busPos.index };
+    if (busDist != null && targetDist != null && velocity > 5) {
+      const remainingM = targetDist - busDist;
+      if (remainingM > 0) {
+        const speedEta = Math.round(remainingM / (velocity * 1000 / 60)); // minutes
+        // Blend: 60% speed-based (real-time), 40% schedule (accounts for stops/traffic patterns)
+        eta = Math.round(speedEta * 0.6 + scheduleEta * 0.4);
+      }
+    }
+
+    if (eta <= 0) return { passed: true };
+    const stopsAway = targetIdx - busPos.index;
+    return { eta, stopsAway };
   }
 
   // Best live ETA for closest stop

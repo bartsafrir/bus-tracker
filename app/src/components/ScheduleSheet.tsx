@@ -39,27 +39,36 @@ export default function ScheduleSheet({ selectedStop, tracked, schedule, opColor
         const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
 
         for (const a of schedule) {
+          if (a.cancelled) { past.push({ ...a, isCancelled: true }); continue; }
           const isPast = a.passed || (!a.live && a.diffMin < -2);
           if (isPast) { past.push(a); continue; }
           const mins = a.live && a.liveEta != null ? a.liveEta : Math.max(0, a.diffMin);
           const arrDateIL = new Date(a.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
           const isTomorrow = arrDateIL > todayIL;
           const isLive = !!a.live;
+          const isDelayed = a.delayMin > 3;
           const cantCatch = walkMin != null && mins < walkMin;
           const tooClose = cantCatch;
           const isNext = !tooClose && !foundNext;
           if (isNext) foundNext = true;
-          upcoming.push({ ...a, mins, isNext, isLive, tooClose, isTomorrow });
+          upcoming.push({ ...a, mins, isNext, isLive, isDelayed, tooClose, isTomorrow });
         }
 
         return (
           <>
-            {past.length > 0 && (
-              <div className="sc-past-bar">
-                <span>{past.length} נסיעות עברו</span>
-                <div className="sc-past-line" />
-              </div>
-            )}
+            {past.length > 0 && (() => {
+              const cancelledCount = past.filter(a => a.isCancelled).length;
+              const passedCount = past.length - cancelledCount;
+              return (
+                <div className="sc-past-bar">
+                  <span>
+                    {passedCount > 0 && `${passedCount} נסיעות עברו`}
+                    {cancelledCount > 0 && <span className="sc-cancelled-count">{passedCount > 0 ? ' · ' : ''}{cancelledCount} בוטלו</span>}
+                  </span>
+                  <div className="sc-past-line" />
+                </div>
+              );
+            })()}
 
             {upcoming.length === 0 && past.length > 0 && (() => {
               const nextRide = schedule.find((a: any) => a.diffMin > 0);
@@ -114,6 +123,7 @@ export default function ScheduleSheet({ selectedStop, tracked, schedule, opColor
                     <div className="sc-row-mid">
                       <span className="live-badge">LIVE</span>
                       {a.stopsAway && <span className="sc-stops">{a.stopsAway} תחנות</span>}
+                      {a.isDelayed && <span className="sc-delay">איחור {a.delayMin} דק'</span>}
                       {a.tooClose && <span className="sc-miss">לא תספיק</span>}
                     </div>
                     <div className="sc-clock-col">
@@ -131,6 +141,7 @@ export default function ScheduleSheet({ selectedStop, tracked, schedule, opColor
                     <div className="sc-mins-label">דק'</div>
                   </div>
                   <div className="sc-row-mid">
+                    {a.isDelayed && <span className="sc-delay">איחור {a.delayMin} דק'</span>}
                     {a.tooClose && <span className="sc-miss">לא תספיק</span>}
                   </div>
                   <div className="sc-clock-col">
