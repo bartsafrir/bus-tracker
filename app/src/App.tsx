@@ -3,8 +3,13 @@ import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet'
 import { FitBoundsOnChange, FlyToLocation, MapClickHandler } from './components/Map/MapControls';
 import L from 'leaflet';
 import { getOperatorColor } from './utils/operators';
-import { toIsraelTime } from './utils/time';
+import { toIsraelTime, today } from './utils/time';
 import { distanceM } from './utils/geo';
+import { latestPerVehicle, fmtDir, extractCitiesSmart } from './utils/routes';
+import { getRoute } from './utils/polyline';
+import { getCachedRoute, setCachedRoute } from './utils/routeCache';
+import { removeLoops } from './utils/removeLoops';
+import { apiFetch } from './api/client';
 import { SearchIcon, LocationIcon, SunIcon, MoonIcon, BackIcon } from './components/Icons';
 import SearchOverlay from './components/SearchOverlay';
 import HomeSheet from './components/HomeSheet';
@@ -12,84 +17,6 @@ import TrackingSheet from './components/TrackingSheet';
 import ScheduleSheet from './components/ScheduleSheet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
-
-const API_BASE = 'https://open-bus-stride-api.hasadna.org.il';
-
-// ─── Simple fetch with timeout (used for non-cached calls) ───
-async function apiFetch(endpoint, params = {}) {
-  const url = new URL(`${API_BASE}${endpoint}`);
-  for (const [k, v] of Object.entries(params)) if (v != null) url.searchParams.set(k, String(v));
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 15000);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error(`${res.status}`);
-    return res.json();
-  } finally { clearTimeout(t); }
-}
-
-// today() imported from utils/time
-
-// Routing imported from utils
-import { getRoute } from './utils/polyline';
-import { getCachedRoute, setCachedRoute } from './utils/routeCache';
-
-// Post-process OSRM route: remove loops, but keep loops that serve stops.
-function removeLoops(path, stopCoords) {
-  if (path.length < 10 || !stopCoords?.length) return path;
-  const GRID = 0.0003; // ~30m
-  const cellKey = (lat, lon) => `${Math.round(lat / GRID)},${Math.round(lon / GRID)}`;
-
-  // For each detected loop, check if removing it would orphan a stop.
-  // If yes, keep the loop. If no, remove it.
-  const result = [];
-  let i = 0;
-  while (i < path.length) {
-    result.push(path[i]);
-    const key = cellKey(path[i][0], path[i][1]);
-    let jumpTo = -1;
-    for (let j = i + 10; j < Math.min(i + 150, path.length); j++) {
-      if (cellKey(path[j][0], path[j][1]) === key) jumpTo = j;
-    }
-
-    if (jumpTo > 0) {
-      // Found a loop from i to jumpTo. Check: would any stop be orphaned?
-      // A stop is "served by the loop" if it's closer to the loop segment
-      // than to the non-loop path (i.e., the remaining path without the loop).
-      const loopSegment = path.slice(i, jumpTo + 1);
-      let stopNeedsLoop = false;
-
-      for (const stop of stopCoords) {
-        // Distance from stop to closest point IN the loop
-        let minLoopDist = Infinity;
-        for (const p of loopSegment) {
-          const d = distanceM(stop[0], stop[1], p[0], p[1]);
-          if (d < minLoopDist) minLoopDist = d;
-        }
-        // Distance from stop to the junction point (where we'd skip to)
-        const junctionDist = distanceM(stop[0], stop[1], path[jumpTo][0], path[jumpTo][1]);
-
-        // If a stop is very close to the loop (<40m) and far from the junction (>80m),
-        // this loop is needed to reach that stop
-        if (minLoopDist < 40 && junctionDist > 80) {
-          stopNeedsLoop = true;
-          break;
-        }
-      }
-
-      if (stopNeedsLoop) {
-        // Keep the loop — don't skip
-        i++;
-      } else {
-        // Remove the loop — skip to jumpTo
-        i = jumpTo + 1;
-      }
-    } else {
-      i++;
-    }
-  }
-  return result.length > 1 ? result : path;
-}
 
 // ─── Leaflet icons ───
 const meIcon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [20, 20], iconAnchor: [10, 10] });
@@ -113,10 +40,6 @@ function makeBusIcon(bearing, color, lineNum) {
   });
 }
 
-
-// Imported from utils/routes
-import { latestPerVehicle } from './utils/routes';
-import { today } from './utils/time';
 
 // ═══════════════════════════════════════════
 // APP
@@ -147,7 +70,7 @@ export default function App() {
   }
 
   // Display helper: RTL arrow between from and to
-  function fmtDir(from, to) { return `${from} \u2190 ${to}`; }
+  // fmtDir imported from utils/routes
 
   // Log usage every time a line is tracked
   function logUsage(line) {
@@ -731,31 +654,8 @@ export default function App() {
     setView('search');
   }
 
-  // ═══ HELPERS ═══
-  function extractCities(name) {
-    // "כרמלית-תל אביב יפו<->ת. מרכזית רחובות/רציפים-רחובות-1#"
-    const cleaned = name.replace(/-\d+[#0-9א-ת]*$/, '');
-    const parts = cleaned.split('<->');
-    if (parts.length !== 2) return { from: '', to: '', fromFull: cleaned, toFull: '' };
-
-    // Extract stop name (before last dash) and city (after last dash)
-    const parse = s => {
-      const m = s.match(/^(.+)-([^-]+)$/);
-      if (!m) return { stop: s.trim(), city: '' };
-      return { stop: m[1].trim(), city: m[2].trim() };
-    };
-    const a = parse(parts[0]);
-    const b = parse(parts[1]);
-
-    // If same city, show stop names; otherwise show cities
-    const sameCity = a.city && b.city && a.city === b.city;
-    return {
-      from: sameCity ? a.stop : (a.city || a.stop),
-      to: sameCity ? b.stop : (b.city || b.stop),
-      fromFull: `${a.stop}${a.city ? ', ' + a.city : ''}`,
-      toFull: `${b.stop}${b.city ? ', ' + b.city : ''}`,
-    };
-  }
+  // extractCities and fmtDir imported from utils/routes
+  const extractCities = extractCitiesSmart;
 
   // ═══ SCHEDULE-BASED ETA ═══
   // Instead of straight-line distance / speed, use:

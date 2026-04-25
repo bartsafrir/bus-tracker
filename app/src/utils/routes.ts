@@ -41,6 +41,32 @@ export function groupByOperator(routes) {
   return map;
 }
 
+// Format direction string for display (RTL-safe)
+export function fmtDir(from: string, to: string): string {
+  return `${from} \u2190 ${to}`;
+}
+
+// Extract from/to with same-city handling
+export function extractCitiesSmart(name: string) {
+  const cleaned = name.replace(/-\d+[#0-9\u05D0-\u05EA]*$/, '');
+  const parts = cleaned.split('<->');
+  if (parts.length !== 2) return { from: '', to: '', fromFull: cleaned, toFull: '' };
+  const parse = (s: string) => {
+    const m = s.match(/^(.+)-([^-]+)$/);
+    if (!m) return { stop: s.trim(), city: '' };
+    return { stop: m[1].trim(), city: m[2].trim() };
+  };
+  const a = parse(parts[0]);
+  const b = parse(parts[1]);
+  const sameCity = a.city && b.city && a.city === b.city;
+  return {
+    from: sameCity ? a.stop : (a.city || a.stop),
+    to: sameCity ? b.stop : (b.city || b.stop),
+    fromFull: `${a.stop}${a.city ? ', ' + a.city : ''}`,
+    toFull: `${b.stop}${b.city ? ', ' + b.city : ''}`,
+  };
+}
+
 // Latest location per vehicle from a list of location records
 export function latestPerVehicle(locations) {
   const byV = new Map();
