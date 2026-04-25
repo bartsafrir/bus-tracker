@@ -99,10 +99,6 @@ export default function MapView({
                       <span className="bus-plate-num">{plate}</span>
                     </div>
                   </div>
-                  <div className="bus-popup-stats">
-                    {v.velocity != null && <span className="bus-popup-stat">{v.velocity} קמ"ש</span>}
-                    {v.bearing != null && <span className="bus-popup-stat">{v.bearing}°</span>}
-                  </div>
                   {mins != null && (
                     <div className="bus-popup-time">
                       {mins === 0 ? 'עכשיו' : mins === 1 ? 'לפני דקה' : `לפני ${mins} דק'`}
