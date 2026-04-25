@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&family=Google+Sans:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Text:wght@400;500;700&family=Google+Sans:wght@400;500;700;800&family=Outfit:wght@900&display=swap');
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -184,10 +184,34 @@ body {
 
 /* ═══ FLOATING BAR ═══ */
 .float-bar {
-  position: absolute; top: 56px; left: 20px; right: 20px;
-  z-index: 10; display: flex; gap: 10px;
+  position: absolute; top: 16px; left: 20px; right: 20px;
+  z-index: 10; display: flex; flex-direction: column; gap: 10px;
 }
 .float-bar { animation: fadeIn 0.4s ease; }
+.float-brand-row {
+  display: flex; justify-content: center;
+}
+.float-brand {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -1.5px;
+  color: var(--text1);
+}
+.float-brand.small {
+  font-size: 16px;
+  letter-spacing: -1px;
+  color: var(--text2);
+}
+.float-bar.compact {
+  gap: 6px;
+}
+.float-bar.compact .float-brand-row {
+  padding: 0;
+}
+.float-controls {
+  display: flex; gap: 10px;
+}
 .float-pill {
   flex: 1;
   background: var(--search-bg);
@@ -440,6 +464,65 @@ body {
 
 
 /* ═══ SEARCH OVERLAY ═══ */
+/* ═══ SETTINGS ═══ */
+.settings-overlay {
+  position: absolute; inset: 0;
+  background: var(--overlay-bg);
+  z-index: 35;
+  display: flex; flex-direction: column;
+  padding: 16px 24px;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  animation: fadeIn 0.2s ease;
+}
+.settings-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 40px;
+}
+.settings-brand {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900; font-size: 24px;
+  letter-spacing: -1.5px; color: var(--text1);
+}
+.settings-close {
+  width: 36px; height: 36px;
+  background: var(--chip-bg); border: none; border-radius: 50%;
+  color: var(--text2); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.settings-section {
+  margin-bottom: 32px;
+}
+.settings-label {
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  margin-bottom: 12px;
+}
+.settings-theme-row {
+  display: flex; gap: 12px;
+}
+.settings-theme-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; border-radius: 14px;
+  background: var(--chip-bg); border: 2px solid transparent;
+  color: var(--text2); font-size: 15px; font-weight: 600;
+  font-family: var(--font); cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.settings-theme-btn.active {
+  border-color: #4ADE80; color: #4ADE80;
+}
+.settings-about {
+  font-size: 14px; color: var(--text2); line-height: 1.8;
+}
+.settings-about p { margin: 0; }
+.settings-credit {
+  color: var(--text1); font-size: 14px;
+}
+.settings-credit strong { font-weight: 700; }
+.settings-sub {
+  font-size: 12px; color: var(--text2); opacity: 0.5; margin-top: 4px !important;
+}
+
+/* ═══ SEARCH ═══ */
 .search-overlay {
   position: absolute; inset: 0;
   background: var(--surface);
@@ -447,12 +530,21 @@ body {
   border-top: 1px solid var(--glass-border);
   z-index: 30;
   display: flex; flex-direction: column;
-  padding-top: 56px;
+  padding-top: 16px;
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   animation: fadeIn 0.2s ease;
 }
+.search-brand {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 24px;
+  letter-spacing: -1.5px;
+  color: var(--text1);
+  text-align: center;
+  padding: 4px 0 8px;
+}
 .search-bar {
-  padding: 8px 20px; display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+  padding: 8px 20px; display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; flex-shrink: 0;
 }
 .search-close {
   width: 34px; height: 34px;
@@ -464,7 +556,7 @@ body {
 .search-field {
   flex: 1; background: var(--chip-bg); border: none; border-radius: 14px;
   padding: 12px 18px; font-size: 17px; font-weight: 600;
-  outline: none; direction: ltr; text-align: center;
+  outline: none; direction: rtl; text-align: center;
   font-family: var(--font-display); letter-spacing: -0.2px;
   color: var(--text1);
 }

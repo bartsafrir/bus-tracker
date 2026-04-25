@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
   <rect width="192" height="192" rx="42" fill="#0C0C14"/>
-  <circle cx="96" cy="96" r="54" fill="#4ADE80"/>
-  <circle cx="96" cy="96" r="21" fill="#0C0C14"/>
+  <text x="96" y="118" text-anchor="middle" font-family="Outfit,Arial Black,sans-serif" font-weight="900" font-size="82" letter-spacing="-5" fill="#4ADE80">KAV</text>
 </svg>

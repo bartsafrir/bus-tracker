@@ -14,6 +14,7 @@ import TrackingSheet from './components/TrackingSheet';
 import ScheduleSheet from './components/ScheduleSheet';
 import FloatBar from './components/FloatBar';
 import PinBanner from './components/PinBanner';
+import SettingsOverlay from './components/SettingsOverlay';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
 
@@ -51,6 +52,7 @@ export default function App() {
   const [pinMode, setPinMode] = useState(false);
   const [locError, setLocError] = useState<string | null>(null);
   const [flyToTrigger, setFlyToTrigger] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
 
   // ─── Navigation wrappers ───
   function handleStartTracking(lineName, lineRefs, agencyName, dirFrom?, dirTo?, siblings?) {
@@ -87,13 +89,13 @@ export default function App() {
       />
 
       {/* ── FLOATING BAR ── */}
-      {view !== 'search' && view !== 'schedule' && (
+      {view !== 'search' && view !== 'schedule' && !showSettings && (
         tracked ? (
-          <FloatBar mode="tracking" theme={theme} lineName={tracked.lineName}
+          <FloatBar mode="tracking" lineName={tracked.lineName}
             directionText={tracked.from ? fmtDir(tracked.from, tracked.to) : tracked.agencyName}
-            operatorColor={opColor} onBack={goHome} onToggleTheme={toggleTheme} />
+            operatorColor={opColor} onBack={goHome} onSettings={() => setShowSettings(true)} />
         ) : (
-          <FloatBar mode="home" theme={theme} onSearch={goSearch} onToggleTheme={toggleTheme} onLocate={() => setFlyToTrigger(t => t + 1)} />
+          <FloatBar mode="home" onSearch={goSearch} onSettings={() => setShowSettings(true)} onLocate={() => setFlyToTrigger(t => t + 1)} />
         )
       )}
 
@@ -147,6 +149,11 @@ export default function App() {
           <div className="spinner" style={{ margin: '0 auto 10px' }} />
           <div style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 500 }}>{loadingMsg}</div>
         </div>
+      )}
+
+      {/* ── SETTINGS OVERLAY ── */}
+      {showSettings && (
+        <SettingsOverlay theme={theme} onToggleTheme={toggleTheme} onClose={() => setShowSettings(false)} />
       )}
 
       {/* ── SEARCH OVERLAY ── */}

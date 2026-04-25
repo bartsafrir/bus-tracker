@@ -122,6 +122,7 @@ export default function SearchOverlay({ suggestions, recentLines, onTrackLine, o
 
   return (
     <div className="search-overlay">
+      <div className="search-brand">KAV</div>
       <div className="search-bar">
         <button className="search-close" onClick={onClose}><CloseIcon size={16} /></button>
         <input ref={inputRef} className="search-field" placeholder="הקלד מספר קו..." inputMode="numeric"
