@@ -256,7 +256,7 @@ body {
   overflow: hidden;
 }
 .bottom-sheet.peek { max-height: 280px; }
-.bottom-sheet.half { max-height: 55vh; }
+.bottom-sheet.half { max-height: 45vh; }
 .bottom-sheet.full { max-height: 88vh; }
 .bottom-sheet { animation: slideUp 0.35s ease; }
 
@@ -534,8 +534,8 @@ body {
 /* ═══ LOCATION FAB ═══ */
 .location-fab {
   position: absolute;
-  bottom: 300px; left: 20px;
-  z-index: 15;
+  bottom: calc(45vh + 16px); left: 20px;
+  z-index: 25;
   width: 44px; height: 44px;
   background: var(--surface);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);

@@ -8,8 +8,8 @@ export function israelNow() {
     minute: '2-digit',
     hour12: false,
   }).formatToParts(new Date());
-  const h = parseInt(parts.find(p => p.type === 'hour').value);
-  const m = parseInt(parts.find(p => p.type === 'minute').value);
+  const h = parseInt(parts.find(p => p.type === 'hour')!.value);
+  const m = parseInt(parts.find(p => p.type === 'minute')!.value);
   return { hours: h, minutes: m, totalMinutes: h * 60 + m };
 }
 

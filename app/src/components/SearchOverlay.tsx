@@ -51,16 +51,16 @@ export default function SearchOverlay({ suggestions, recentLines, onTrackLine, o
   const [directions, setDirections] = useState<{ opName: string; routes: any[] } | null>(null);
   const [lineName, setLineName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
 
   // Auto-search debounce
   useEffect(() => {
     if (!query.trim() || query.trim().length < 1) return;
-    clearTimeout(searchTimer.current);
+    if (searchTimer.current !== null) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => doSearch(query), 400);
-    return () => clearTimeout(searchTimer.current);
+    return () => { if (searchTimer.current !== null) clearTimeout(searchTimer.current); };
   }, [query]);
 
   async function doSearch(term?: string) {

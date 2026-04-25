@@ -6,7 +6,7 @@ export function parseRouteName(longName) {
 }
 
 // Extract city names from route_long_name
-export function extractCities(longName) {
+export function extractCities(longName: string) {
   const cleaned = longName.replace(/-\d+[#0-9א-ת]*$/, '');
   const parts = cleaned.split('<->');
   if (parts.length !== 2) return { fromCity: '', toCity: '' };
@@ -19,7 +19,7 @@ export function extractCities(longName) {
 
 // Deduplicate routes by line_ref, keeping first occurrence
 export function dedupeRoutes(routes, dateFilter = null) {
-  const unique = [];
+  const unique: any[] = [];
   const seen = new Set();
   for (const r of routes) {
     if (dateFilter && r.date !== dateFilter) continue;
