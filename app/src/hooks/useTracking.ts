@@ -398,27 +398,15 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
   }
 
   // ═══ SMART ETA ═══
-  // Extrapolate bus distance forward based on data age + velocity
-  // SIRI data is typically 1-3 minutes stale; at 40 km/h that's 1-2 km behind
-  function extrapolateBusDist(vehicle): number | null {
-    const busDist = vehicle.distance_from_journey_start;
-    if (busDist == null || busDist <= 0) return null;
-    const velocity = vehicle.velocity; // km/h
-    if (!velocity || velocity <= 0) return busDist;
-    const recordedAt = vehicle.recorded_at_time ? new Date(vehicle.recorded_at_time).getTime() : 0;
-    if (!recordedAt) return busDist;
-    const ageSec = (Date.now() - recordedAt) / 1000;
-    if (ageSec <= 0 || ageSec > 300) return busDist; // cap at 5 min, don't extrapolate stale data
-    const extraM = velocity * (1000 / 3600) * ageSec; // meters traveled since reading
-    return busDist + extraM;
-  }
+  // Uses distance_from_journey_start + schedule offsets + data age.
+  // No velocity extrapolation — velocity is too noisy to trust.
 
   // Find bus position along route by distance_from_journey_start vs shape_dist_traveled
   function findBusStopIndex(vehicle) {
-    if (!stops.length) return { index: -1, distance: Infinity };
-    const busDist = extrapolateBusDist(vehicle);
+    if (!stops.length) return -1;
+    const busDist = vehicle.distance_from_journey_start;
 
-    // Try distance-based matching first (more accurate than GPS)
+    // Distance-based: find last stop the bus has passed
     if (busDist != null && busDist > 0) {
       let bestIdx = 0;
       for (let i = 0; i < stops.length; i++) {
@@ -426,7 +414,7 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
         if (sd != null && sd <= busDist) bestIdx = i;
         else if (sd != null && sd > busDist) break;
       }
-      return { index: bestIdx, distance: 0, byDistance: true };
+      return bestIdx;
     }
 
     // Fallback: GPS nearest stop
@@ -435,50 +423,44 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
       const d = distanceM(vehicle.lat, vehicle.lon, stops[i].gtfs_stop__lat, stops[i].gtfs_stop__lon);
       if (d < minD) { minD = d; idx = i; }
     }
-    return { index: idx, distance: minD, byDistance: false };
+    return idx;
   }
 
   function calcScheduleEta(vehicle, targetStop) {
     if (!stops.length || !scheduleData?.stopOffsets) return null;
 
-    const busPos = findBusStopIndex(vehicle);
-    if (busPos.index < 0) return null;
+    const busIdx = findBusStopIndex(vehicle);
+    if (busIdx < 0) return null;
 
     const targetIdx = stops.findIndex(s => s.id === targetStop.id);
     if (targetIdx < 0) return null;
 
-    if (busPos.index >= targetIdx) return { passed: true };
+    if (busIdx >= targetIdx) return { passed: true };
 
-    const busStopId = stops[busPos.index].gtfs_stop_id;
+    const busStopId = stops[busIdx].gtfs_stop_id;
     const targetStopId = targetStop.gtfs_stop_id;
     const busOffset = scheduleData.stopOffsets.get(busStopId);
     const targetOffset = scheduleData.stopOffsets.get(targetStopId);
     if (!busOffset || !targetOffset) return null;
 
-    // Schedule-based ETA (time between stops per timetable)
-    const scheduleEta = Math.round((targetOffset.offsetMs - busOffset.offsetMs) / 60000);
+    // Schedule says it takes this long from bus's last passed stop to target
+    const scheduleEta = (targetOffset.offsetMs - busOffset.offsetMs) / 60000;
     if (scheduleEta <= 0) return { passed: true };
     if (scheduleEta > 90) return null;
 
-    // Speed-based ETA using extrapolated distance + velocity
-    let eta = scheduleEta;
-    const busDist = extrapolateBusDist(vehicle);
-    const targetDist = targetOffset.shapeDist;
-    const velocity = vehicle.velocity; // km/h
-
-    if (busDist != null && targetDist != null && velocity > 5) {
-      const remainingM = targetDist - busDist;
-      if (remainingM > 0) {
-        const speedEta = Math.round(remainingM / (velocity * 1000 / 60)); // minutes
-        // Blend: 60% speed-based (real-time), 40% schedule (accounts for stops/traffic patterns)
-        eta = Math.round(speedEta * 0.6 + scheduleEta * 0.4);
-      } else {
-        return { passed: true };
-      }
+    // Subtract data age: bus has been moving since the reading
+    // The schedule time includes the segment the bus is currently on,
+    // but the bus has already been traveling for `ageSec` since passing that stop
+    let dataAgeMin = 0;
+    if (vehicle.recorded_at_time) {
+      const ageSec = (Date.now() - new Date(vehicle.recorded_at_time).getTime()) / 1000;
+      if (ageSec > 0 && ageSec < 300) dataAgeMin = ageSec / 60;
     }
 
+    const eta = Math.max(0, Math.round(scheduleEta - dataAgeMin));
     if (eta <= 0) return { passed: true };
-    const stopsAway = targetIdx - busPos.index;
+
+    const stopsAway = targetIdx - busIdx;
     return { eta, stopsAway };
   }
 
