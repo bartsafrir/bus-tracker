@@ -38,10 +38,11 @@ export default function ScheduleSheet({ selectedStop, tracked, schedule, opColor
         let foundNext = false;
         const todayIL = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
 
+        let lastPassed: any = null;
         for (const a of schedule) {
           if (a.cancelled) { past.push({ ...a, isCancelled: true }); continue; }
           const isPast = a.passed || (!a.live && a.diffMin < -2);
-          if (isPast) { past.push(a); continue; }
+          if (isPast) { lastPassed = a; past.push(a); continue; }
           const mins = a.live && a.liveEta != null ? a.liveEta : Math.max(0, a.diffMin);
           const arrDateIL = new Date(a.arrivalMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
           const isTomorrow = arrDateIL > todayIL;
@@ -57,17 +58,33 @@ export default function ScheduleSheet({ selectedStop, tracked, schedule, opColor
         return (
           <>
             {past.length > 0 && (() => {
+              const hiddenPast = lastPassed ? past.length - 1 : past.length;
               const cancelledCount = past.filter(a => a.isCancelled).length;
-              const passedCount = past.length - cancelledCount;
-              return (
-                <div className="sc-past-bar">
-                  <span>
-                    {passedCount > 0 && `${passedCount} נסיעות עברו`}
-                    {cancelledCount > 0 && <span className="sc-cancelled-count">{passedCount > 0 ? ' · ' : ''}{cancelledCount} בוטלו</span>}
-                  </span>
-                  <div className="sc-past-line" />
-                </div>
-              );
+              const passedCount = hiddenPast - cancelledCount;
+              return (<>
+                {hiddenPast > 0 && (
+                  <div className="sc-past-bar">
+                    <span>
+                      {passedCount > 0 && `${passedCount} נסיעות עברו`}
+                      {cancelledCount > 0 && <span className="sc-cancelled-count">{passedCount > 0 ? ' · ' : ''}{cancelledCount} בוטלו</span>}
+                    </span>
+                    <div className="sc-past-line" />
+                  </div>
+                )}
+                {lastPassed && !lastPassed.isCancelled && (
+                  <div className="sc-row faded">
+                    <div className="sc-mins-col">
+                      <div className="sc-mins-big" style={{ opacity: 0.4 }}>עבר</div>
+                    </div>
+                    <div className="sc-row-mid">
+                      {lastPassed.live && <span className="live-badge" style={{ opacity: 0.4 }}>LIVE</span>}
+                    </div>
+                    <div className="sc-clock-col">
+                      <span className="sc-clock-time">{lastPassed.str}</span>
+                    </div>
+                  </div>
+                )}
+              </>);
             })()}
 
             {upcoming.length === 0 && past.length > 0 && (() => {
