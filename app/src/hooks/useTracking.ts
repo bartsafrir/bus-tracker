@@ -359,6 +359,32 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
     } catch (e) { console.error('Schedule:', e); }
   }
 
+  // ─── Recalculate schedule ETAs when vehicles update ───
+  useEffect(() => {
+    if (!schedule || !selectedStop || !vehicles.length) return;
+    const liveByStart = new Map();
+    for (const v of vehicles) {
+      if (v.siri_ride__scheduled_start_time) {
+        const key = v.siri_ride__scheduled_start_time.substring(11, 16);
+        if (!liveByStart.has(key)) liveByStart.set(key, v);
+      }
+    }
+    const nowMs = Date.now();
+    const updated = schedule.map(item => {
+      const key = new Date(item.arrivalMs - (scheduleData?.stopOffsets?.get(selectedStop.gtfs_stop_id)?.offsetMs || 0)).toISOString().substring(11, 16);
+      const live = liveByStart.get(key) || item.live;
+      let liveEta: number | null = null, passed = item.passed, stopsAway: number | null = null;
+      if (live) {
+        const result = calcScheduleEta(live, selectedStop);
+        if (result?.passed) passed = true;
+        else if (result?.eta) { liveEta = result.eta; stopsAway = result.stopsAway; }
+      }
+      const diffMin = Math.round((item.arrivalMs - nowMs) / 60000);
+      return { ...item, live, liveEta, passed, stopsAway, diffMin };
+    });
+    setSchedule(updated);
+  }, [vehicles]);
+
   // ═══ GO HOME ═══
   function goHome() {
     setTracked(null);
