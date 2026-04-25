@@ -99,7 +99,7 @@ export default function App() {
 
 
       {/* ── LOCATION FAB ── */}
-      <button className="location-fab" onClick={() => {
+      {view !== 'schedule' && view !== 'search' && <button className="location-fab" onClick={() => {
         // If we have a location, just fly to it
         if (savedLoc) {
           setFlyToTrigger(t => t + 1);
@@ -136,7 +136,7 @@ export default function App() {
         }
       }}>
         <LocationIcon size={20} color="var(--text1)" />
-      </button>
+      </button>}
 
       {/* ── PIN BANNER ── */}
       {pinMode && <PinBanner locError={locError} onCancel={() => { setPinMode(false); setLocError(null); }} />}
