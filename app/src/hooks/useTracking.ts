@@ -372,11 +372,25 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
   }
 
   // ═══ SMART ETA ═══
+  // Extrapolate bus distance forward based on data age + velocity
+  // SIRI data is typically 1-3 minutes stale; at 40 km/h that's 1-2 km behind
+  function extrapolateBusDist(vehicle): number | null {
+    const busDist = vehicle.distance_from_journey_start;
+    if (busDist == null || busDist <= 0) return null;
+    const velocity = vehicle.velocity; // km/h
+    if (!velocity || velocity <= 0) return busDist;
+    const recordedAt = vehicle.recorded_at_time ? new Date(vehicle.recorded_at_time).getTime() : 0;
+    if (!recordedAt) return busDist;
+    const ageSec = (Date.now() - recordedAt) / 1000;
+    if (ageSec <= 0 || ageSec > 300) return busDist; // cap at 5 min, don't extrapolate stale data
+    const extraM = velocity * (1000 / 3600) * ageSec; // meters traveled since reading
+    return busDist + extraM;
+  }
+
   // Find bus position along route by distance_from_journey_start vs shape_dist_traveled
-  // Falls back to GPS nearest-stop when distance data is missing
   function findBusStopIndex(vehicle) {
     if (!stops.length) return { index: -1, distance: Infinity };
-    const busDist = vehicle.distance_from_journey_start;
+    const busDist = extrapolateBusDist(vehicle);
 
     // Try distance-based matching first (more accurate than GPS)
     if (busDist != null && busDist > 0) {
@@ -420,9 +434,9 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
     if (scheduleEta <= 0) return { passed: true };
     if (scheduleEta > 90) return null;
 
-    // Speed-based ETA using distance + velocity
+    // Speed-based ETA using extrapolated distance + velocity
     let eta = scheduleEta;
-    const busDist = vehicle.distance_from_journey_start;
+    const busDist = extrapolateBusDist(vehicle);
     const targetDist = targetOffset.shapeDist;
     const velocity = vehicle.velocity; // km/h
 
@@ -432,6 +446,8 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
         const speedEta = Math.round(remainingM / (velocity * 1000 / 60)); // minutes
         // Blend: 60% speed-based (real-time), 40% schedule (accounts for stops/traffic patterns)
         eta = Math.round(speedEta * 0.6 + scheduleEta * 0.4);
+      } else {
+        return { passed: true };
       }
     }
 
