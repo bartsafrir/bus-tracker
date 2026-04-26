@@ -254,7 +254,26 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
 
     const stopId = stop.gtfs_stop_id;
     const info = scheduleData?.stopOffsets?.get(stopId);
-    if (!info || !scheduleData?.todayGtfsRouteId) return;
+    if (!info || !scheduleData?.todayGtfsRouteId) {
+      // Still show schedule from GTFS rides even without stop offsets
+      try {
+        const routeId = scheduleData?.todayGtfsRouteId;
+        if (!routeId) { setSchedule([]); return; }
+        const allRides = await apiFetch('/gtfs_rides/list', { gtfs_route_id: routeId, limit: 200, order_by: 'start_time asc' });
+        const seen = new Set();
+        const nowMs = Date.now();
+        const arr = allRides
+          .filter(r => r.start_time && !seen.has(r.start_time) && (seen.add(r.start_time), true))
+          .map(r => {
+            const ms = new Date(r.start_time).getTime();
+            const il = toIsraelTime(new Date(ms));
+            return { ...il, diffMin: Math.round((ms - nowMs) / 60000), arrivalMs: ms, live: null, liveEta: null, passed: false, stopsAway: null, cancelled: false, delayMin: 0 };
+          })
+          .sort((a, b) => a.arrivalMs - b.arrivalMs);
+        setSchedule(arr);
+      } catch { setSchedule([]); }
+      return;
+    }
 
     try {
       const routeIds = [scheduleData.todayGtfsRouteId];
@@ -356,7 +375,7 @@ export function useTracking(savedLoc: Position | null, logUsage: LogUsageFn) {
       }).sort((a, b) => a.arrivalMs - b.arrivalMs);
 
       setSchedule(arr);
-    } catch (e) { console.error('Schedule:', e); }
+    } catch (e) { console.error('Schedule:', e); setSchedule([]); }
   }
 
   // ─── Recalculate schedule ETAs when vehicles update ───
